@@ -1,0 +1,8 @@
+[project]
+name = "Aptitude"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.128.8",
+    "uvicorn>=0.39.0",
+]
