@@ -1,6 +1,6 @@
 # app module
 
-Application package for the Aptitude service.
+Application package for the aptitude-server service.
 
 ## Purpose
 

@@ -1,7 +1,7 @@
 [project]
-name = "aptitude"
+name = "aptitude-server"
 version = "0.1.0"
-description = "Aptitude foundation service skeleton"
+description = "aptitude-server foundation service skeleton"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.16.5",

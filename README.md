@@ -1,9 +1,9 @@
-# Aptitude Repository
+# aptitude-server Repository
 
 ![Python Version](https://img.shields.io/badge/python-3.12+-3776AB?logo=python)
-![License](https://img.shields.io/github/license/y0ncha/aptitude)
-![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude)
-![Issues](https://img.shields.io/github/issues/yoncha/aptitude)
+![License](https://img.shields.io/github/license/y0ncha/aptitude-server)
+![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude-server)
+![Issues](https://img.shields.io/github/issues/y0ncha/aptitude-server)
 ![Status](https://img.shields.io/badge/status-active--development-blue)
 
 Aptitude is a versioned, dependency-aware skill repository for AI systems.  

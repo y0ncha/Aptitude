@@ -23,6 +23,9 @@
 - Explicit typed relationships (`depends_on`, `conflicts_with`, `overlaps_with`, `extends`).
 - Execution-agnostic repository behavior.
 
+## Naming Convention
+- Use `kebab-case` for new filenames, rule identifiers, and plan slugs unless an external framework/tool requires a different format.
+
 ## Planning and Execution
 - Work on one milestone plan file at a time (`.agents/plans/plan-XX-*.md`).
 - Do not start the next plan file before the current one meets its acceptance criteria.

@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Create and configure a FastAPI application instance."""
-    app = FastAPI(title="Aptitude Service", lifespan=lifespan)
+    app = FastAPI(title="aptitude-server Service", lifespan=lifespan)
     app.state.readiness_service = ReadinessService(
         database_probe=SQLAlchemyDatabaseReadinessProbe(),
     )

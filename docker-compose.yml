@@ -15,7 +15,7 @@ services:
       retries: 10
       start_period: 5s
     volumes:
-      - aptitude_postgres_data:/var/lib/postgresql/data
+      - aptitude-postgres-data:/var/lib/postgresql/data
 
 volumes:
-  aptitude_postgres_data:
+  aptitude-postgres-data:

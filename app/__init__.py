@@ -1,1 +1,1 @@
-"""Aptitude service package."""
+"""aptitude-server service package."""
