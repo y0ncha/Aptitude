@@ -24,6 +24,4 @@ def test_openapi_excludes_resolver_endpoints() -> None:
     paths = set(app.openapi().get("paths", {}).keys())
 
     assert not any(path in paths for path in _FORBIDDEN_PATHS)
-    assert not any(
-        any(path.startswith(prefix) for prefix in _FORBIDDEN_PREFIXES) for path in paths
-    )
+    assert not any(any(path.startswith(prefix) for prefix in _FORBIDDEN_PREFIXES) for path in paths)

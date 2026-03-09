@@ -66,6 +66,4 @@ class FileSystemArtifactStore(ArtifactStorePort):
         try:
             return absolute_path.read_bytes()
         except OSError as exc:
-            raise ArtifactStoreError(
-                f"Failed reading immutable artifact: {relative_path}"
-            ) from exc
+            raise ArtifactStoreError(f"Failed reading immutable artifact: {relative_path}") from exc

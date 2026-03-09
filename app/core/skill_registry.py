@@ -216,9 +216,7 @@ class SkillRegistryService:
                 skill_id=manifest.skill_id, version=manifest.version
             ) from exc
         except ArtifactStoreError as exc:
-            raise ArtifactStorageFailureError(
-                "Artifact storage failed during publish."
-            ) from exc
+            raise ArtifactStorageFailureError("Artifact storage failed during publish.") from exc
 
         checksum = ChecksumExpectation(algorithm=SHA256_ALGORITHM, digest=checksum_digest)
 

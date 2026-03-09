@@ -78,6 +78,10 @@ MARKER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 # surface is discoverable in generated OpenAPI docs.
 router = APIRouter(tags=["skills"])
 
+# FastAPI expects route-level OpenAPI response metadata to allow either integer
+# HTTP status codes or string keys such as "default".
+OpenAPIResponses = dict[int | str, dict[str, Any]]
+
 
 class RelationshipRef(BaseModel):
     """Typed manifest reference to another immutable skill version.
@@ -125,8 +129,7 @@ class DependencyDeclaration(BaseModel):
         default=None,
         pattern=SEMVER_PATTERN,
         description=(
-            "Exact immutable dependency version. Mutually exclusive with "
-            "`version_constraint`."
+            "Exact immutable dependency version. Mutually exclusive with `version_constraint`."
         ),
     )
     version_constraint: str | None = Field(
@@ -343,7 +346,7 @@ class SkillVersionListResponse(BaseModel):
 
 
 # Shared OpenAPI error documentation for the publish endpoint.
-PUBLISH_ERROR_RESPONSES = {
+PUBLISH_ERROR_RESPONSES: OpenAPIResponses = {
     status.HTTP_409_CONFLICT: {
         "model": ErrorEnvelope,
         "description": "The requested immutable `skill_id@version` already exists.",
@@ -359,7 +362,7 @@ PUBLISH_ERROR_RESPONSES = {
 }
 
 # Shared OpenAPI error documentation for the fetch endpoint.
-FETCH_ERROR_RESPONSES = {
+FETCH_ERROR_RESPONSES: OpenAPIResponses = {
     status.HTTP_404_NOT_FOUND: {
         "model": ErrorEnvelope,
         "description": "The requested immutable `skill_id@version` does not exist.",

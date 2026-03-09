@@ -190,10 +190,7 @@ def _build_relationship_edges(
                 edge_type=edge_type,
                 item=item,
             )
-            if (
-                not isinstance(target_skill_id, str)
-                or not isinstance(target_version_selector, str)
-            ):
+            if not isinstance(target_skill_id, str) or not isinstance(target_version_selector, str):
                 continue
             if not target_skill_id or not target_version_selector:
                 continue
