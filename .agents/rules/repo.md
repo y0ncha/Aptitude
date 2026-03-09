@@ -32,6 +32,8 @@
 - Do not start the next plan file before the current one meets its acceptance criteria.
 - Keep plan files append-only: do not renumber or rename completed plans.
 - Every implementation PR should map to exactly one active plan file.
+- When finishing work on a plan, review older changelogs and prior implementation
+  work for logic conflicts, redundant code, or obsolete code that can now be removed.
 
 ## TDD Workflow
 - Follow RED -> GREEN -> REFACTOR for non-trivial changes.
