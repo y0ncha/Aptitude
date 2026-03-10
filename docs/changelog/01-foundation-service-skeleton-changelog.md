@@ -48,7 +48,7 @@ sequenceDiagram
 
 - `app/main.py` owns process-scoped service construction and `app.state` registration; routers only consume typed dependencies. See [app/main.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/main.py) and [app/core/dependencies.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/core/dependencies.py).
 - Health endpoints are intentionally narrow. `GET /healthz` reports process liveness and config identity, while `GET /readyz` adds database reachability through the readiness service. See [app/interface/api/health.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/interface/api/health.py) and [tests/integration/test_health_endpoints.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/integration/test_health_endpoints.py).
-- The milestone is registry-only. Resolver-owned routes such as `/resolve`, bundle retrieval, and report retrieval are guarded against at the API boundary rather than being stubbed. See [tests/unit/test_registry_api_boundary.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/unit/test_registry_api_boundary.py).
+- The milestone is registry-only. Client-owned routes such as `/resolve`, `/solve`, lock endpoints, bundle retrieval, and report retrieval are guarded against at the API boundary rather than being stubbed. See [tests/unit/test_registry_api_boundary.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/unit/test_registry_api_boundary.py).
 - Baseline persistence is intentionally small. The first migration creates only the audit table, leaving catalog tables to later milestones. See [alembic/versions/0001_baseline_audit_event.py](/Users/yonatan/Dev/Aptitude/aptitude-server/alembic/versions/0001_baseline_audit_event.py).
 
 ## Schema Reference

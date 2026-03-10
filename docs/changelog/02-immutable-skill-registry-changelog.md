@@ -17,7 +17,7 @@ This changelog documents implementation alignment for [.agents/plans/02-immutabl
 
 ```mermaid
 flowchart LR
-    Client["Publisher / Resolver"] --> API["Skills API<br/>app/interface/api/skills.py"]
+    Client["Publisher / Client Runtime"] --> API["Skills API<br/>app/interface/api/skills.py"]
     API --> Core["SkillRegistryService<br/>app/core/skill_registry.py"]
     Core --> Artifact["FileSystemArtifactStore"]
     Core --> Repo["SQLAlchemySkillRegistryRepository"]
@@ -29,7 +29,7 @@ flowchart LR
 
 Why this shape:
 - The service owns the transaction boundary between contract validation, artifact storage, metadata persistence, and audit emission. See [app/core/skill_registry.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/core/skill_registry.py).
-- The API remains registry-oriented. It returns immutable metadata and artifacts, but excludes resolver-owned solve, lock, and execution behavior. See [app/interface/api/skills.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/interface/api/skills.py) and [tests/unit/test_registry_api_boundary.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/unit/test_registry_api_boundary.py).
+- The API remains registry-oriented. It returns immutable metadata and artifacts, but excludes client-owned solve, lock, and execution behavior. See [app/interface/api/skills.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/interface/api/skills.py) and [tests/unit/test_registry_api_boundary.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/unit/test_registry_api_boundary.py).
 
 ## Runtime Flow
 
@@ -58,7 +58,7 @@ sequenceDiagram
 - Duplicate protection is layered. The service pre-checks `(skill_id, version)`, the filesystem adapter guards immutable paths, and the database enforces a unique constraint on `(skill_fk, version)`. See [app/core/skill_registry.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/core/skill_registry.py), [app/persistence/artifact_store.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/artifact_store.py), and [alembic/versions/0002_immutable_skill_registry.py](/Users/yonatan/Dev/Aptitude/aptitude-server/alembic/versions/0002_immutable_skill_registry.py).
 - Exact version fetches always recompute `sha256` over stored artifact bytes before returning a response, so corruption is detected on the read path rather than assumed away. See [app/core/skill_registry.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/core/skill_registry.py) and [tests/integration/test_skill_registry_endpoints.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/integration/test_skill_registry_endpoints.py).
 - Provenance basics are currently represented by immutable manifest snapshots plus audit events, not a dedicated provenance table. See [app/persistence/artifact_store.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/artifact_store.py) and [app/persistence/models/audit_event.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/models/audit_event.py).
-- Version listing is deterministic by `published_at DESC, id DESC`, which keeps repeated reads stable for resolver-side lock and replay flows. See [app/persistence/skill_registry_repository.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/skill_registry_repository.py) and [tests/integration/test_skill_registry_endpoints.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/integration/test_skill_registry_endpoints.py).
+- Version listing is deterministic by `published_at DESC, id DESC`, which keeps repeated reads stable for client-side lock and replay flows. See [app/persistence/skill_registry_repository.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/skill_registry_repository.py) and [tests/integration/test_skill_registry_endpoints.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/integration/test_skill_registry_endpoints.py).
 
 ## Schema Reference
 

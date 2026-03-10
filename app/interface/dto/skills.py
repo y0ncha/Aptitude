@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -175,23 +174,6 @@ class SkillManifest(BaseModel):
     )
 
     model_config = ConfigDict(extra="forbid")
-
-
-class ErrorBody(BaseModel):
-    """Error detail object for API error envelope."""
-
-    code: str = Field(description="Stable machine-readable error code.")
-    message: str = Field(description="Human-readable summary of the failure.")
-    details: dict[str, Any] | None = Field(
-        default=None,
-        description="Optional structured metadata to help clients debug the error.",
-    )
-
-
-class ErrorEnvelope(BaseModel):
-    """Standardized error envelope for milestone 02 endpoints."""
-
-    error: ErrorBody = Field(description="Normalized error payload.")
 
 
 class ChecksumResponse(BaseModel):

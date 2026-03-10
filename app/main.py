@@ -8,12 +8,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 
 from app.audit.recorder import SQLAlchemyAuditRecorder
 from app.core.logging import build_logging_config, configure_logging
 from app.core.readiness import ReadinessService
 from app.core.settings import get_settings, reset_settings_cache
 from app.core.skill_registry import SkillRegistryService
+from app.interface.api.errors import request_validation_exception_handler
 from app.interface.api.health import router as health_router
 from app.interface.api.skills import router as skills_router
 from app.persistence.artifact_store import FileSystemArtifactStore
@@ -39,6 +41,16 @@ STARTUP_BANNER = r"""
 configure_logging(os.getenv("LOG_LEVEL", "INFO"))
 
 logger = logging.getLogger(__name__)
+
+API_VERSION = "1.0.0"
+API_DESCRIPTION = """
+Registry-first API for immutable skill publication, exact version retrieval, and
+version listing.
+
+The server owns data-local registry operations only. Prompt interpretation,
+reranking, dependency solving, final selection, lock generation, and execution
+planning remain client-owned behavior outside this API boundary.
+""".strip()
 
 
 @asynccontextmanager
@@ -66,10 +78,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Create and configure a FastAPI application instance."""
-    app = FastAPI(title="aptitude-server Service", lifespan=lifespan)
+    app = FastAPI(
+        title="aptitude-server Service",
+        description=API_DESCRIPTION,
+        version=API_VERSION,
+        lifespan=lifespan,
+    )
     app.state.readiness_service = ReadinessService(
         database_probe=SQLAlchemyDatabaseReadinessProbe(),
     )
+    app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
     app.include_router(health_router)
     app.include_router(skills_router)
     return app

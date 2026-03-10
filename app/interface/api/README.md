@@ -18,3 +18,6 @@ mapping for health and skill catalog operations.
 
 Business decisions should stay in core services; routers should focus on API
 contract validation, dependency declaration syntax checks, and error translation.
+`GET /skills/search` is intentionally not implemented yet in this module; the
+future search API remains candidate generation only and does not move resolver
+decision logic into the server.

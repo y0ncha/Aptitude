@@ -1,0 +1,1116 @@
+{
+  "components": {
+    "schemas": {
+      "ArtifactMetadataResponse": {
+        "description": "Immutable metadata describing where and how large the artifact is.",
+        "properties": {
+          "relative_path": {
+            "description": "Artifact path relative to the configured artifact root.",
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "size_bytes": {
+            "description": "Stored artifact size in bytes.",
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "relative_path",
+          "size_bytes"
+        ],
+        "title": "ArtifactMetadataResponse",
+        "type": "object"
+      },
+      "Body_publishSkillVersion": {
+        "properties": {
+          "artifact": {
+            "contentMediaType": "application/octet-stream",
+            "description": "Binary artifact associated with the published version.",
+            "title": "Artifact",
+            "type": "string"
+          },
+          "manifest": {
+            "description": "Manifest JSON string describing the immutable skill version.",
+            "title": "Manifest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "manifest",
+          "artifact"
+        ],
+        "title": "Body_publishSkillVersion",
+        "type": "object"
+      },
+      "ChecksumResponse": {
+        "description": "Checksum metadata attached to a stored artifact.",
+        "properties": {
+          "algorithm": {
+            "description": "Checksum algorithm used for the artifact.",
+            "title": "Algorithm",
+            "type": "string"
+          },
+          "digest": {
+            "description": "Hex digest of the stored artifact.",
+            "title": "Digest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "algorithm",
+          "digest"
+        ],
+        "title": "ChecksumResponse",
+        "type": "object"
+      },
+      "DependencyDeclaration": {
+        "additionalProperties": false,
+        "description": "Direct dependency contract authored for a specific immutable version.",
+        "properties": {
+          "markers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Execution markers preserved exactly as authored in the manifest.",
+            "title": "Markers"
+          },
+          "optional": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether consumers may omit this dependency at runtime.",
+            "title": "Optional"
+          },
+          "skill_id": {
+            "description": "Stable identifier of the dependency skill.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,127})$",
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Exact immutable dependency version. Mutually exclusive with `version_constraint`.",
+            "title": "Version"
+          },
+          "version_constraint": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Comma-separated semver comparators, for example `>=1.0.0,<2.0.0`. Mutually exclusive with `version`.",
+            "title": "Version Constraint"
+          }
+        },
+        "required": [
+          "skill_id"
+        ],
+        "title": "DependencyDeclaration",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "description": "Error detail object for the public API error envelope.",
+        "properties": {
+          "code": {
+            "description": "Stable machine-readable error code.",
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional structured metadata to help clients debug the error.",
+            "title": "Details"
+          },
+          "message": {
+            "description": "Human-readable summary of the failure.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "description": "Standardized error envelope shared across HTTP endpoints.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody",
+            "description": "Normalized error payload."
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "HealthzResponse": {
+        "properties": {
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "environment"
+        ],
+        "title": "HealthzResponse",
+        "type": "object"
+      },
+      "ReadinessCheck": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "ReadinessCheck",
+        "type": "object"
+      },
+      "ReadyzResponse": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "ReadyzResponse",
+        "type": "object"
+      },
+      "RelationshipRef": {
+        "additionalProperties": false,
+        "description": "Typed manifest reference to another immutable skill version.",
+        "properties": {
+          "skill_id": {
+            "description": "Stable identifier of the related skill.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,127})$",
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "version": {
+            "description": "Exact semantic version of the related immutable skill.",
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill_id",
+          "version"
+        ],
+        "title": "RelationshipRef",
+        "type": "object"
+      },
+      "SkillManifest": {
+        "additionalProperties": false,
+        "description": "Validated immutable skill manifest contract.",
+        "properties": {
+          "conflicts_with": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RelationshipRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Immutable skill versions known to conflict with this version.",
+            "title": "Conflicts With"
+          },
+          "depends_on": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DependencyDeclaration"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Direct dependency declarations authored for this immutable version.",
+            "title": "Depends On"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional human-readable summary of the skill.",
+            "title": "Description"
+          },
+          "extends": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RelationshipRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Other immutable skill versions this version extends.",
+            "title": "Extends"
+          },
+          "name": {
+            "description": "Human-readable skill name.",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "overlaps_with": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RelationshipRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Immutable skill versions with overlapping behavior or scope.",
+            "title": "Overlaps With"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "description": "Manifest schema version understood by this API.",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "skill_id": {
+            "description": "Stable catalog identifier for the skill.",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,127})$",
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "tags": {
+            "description": "Free-form tags used for categorization and discovery.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "version": {
+            "description": "Immutable semantic version being published or fetched.",
+            "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill_id",
+          "version",
+          "name"
+        ],
+        "title": "SkillManifest",
+        "type": "object"
+      },
+      "SkillVersionDetailResponse": {
+        "description": "Metadata returned after a successful publish or fetch.",
+        "properties": {
+          "artifact_metadata": {
+            "$ref": "#/components/schemas/ArtifactMetadataResponse",
+            "description": "Location and size metadata for the immutable artifact."
+          },
+          "checksum": {
+            "$ref": "#/components/schemas/ChecksumResponse",
+            "description": "Checksum metadata for integrity checks."
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/SkillManifest",
+            "description": "Validated manifest as stored by the service."
+          },
+          "published_at": {
+            "description": "UTC timestamp when the version was published.",
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "skill_id": {
+            "description": "Stable identifier of the skill.",
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "version": {
+            "description": "Immutable semantic version of the skill.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill_id",
+          "version",
+          "manifest",
+          "checksum",
+          "artifact_metadata",
+          "published_at"
+        ],
+        "title": "SkillVersionDetailResponse",
+        "type": "object"
+      },
+      "SkillVersionFetchResponse": {
+        "description": "Fetch response that includes the binary artifact encoded for JSON transport.",
+        "properties": {
+          "artifact_base64": {
+            "description": "Artifact bytes encoded as a base64 ASCII string.",
+            "title": "Artifact Base64",
+            "type": "string"
+          },
+          "artifact_metadata": {
+            "$ref": "#/components/schemas/ArtifactMetadataResponse",
+            "description": "Location and size metadata for the immutable artifact."
+          },
+          "checksum": {
+            "$ref": "#/components/schemas/ChecksumResponse",
+            "description": "Checksum metadata for integrity checks."
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/SkillManifest",
+            "description": "Validated manifest as stored by the service."
+          },
+          "published_at": {
+            "description": "UTC timestamp when the version was published.",
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "skill_id": {
+            "description": "Stable identifier of the skill.",
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "version": {
+            "description": "Immutable semantic version of the skill.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill_id",
+          "version",
+          "manifest",
+          "checksum",
+          "artifact_metadata",
+          "published_at",
+          "artifact_base64"
+        ],
+        "title": "SkillVersionFetchResponse",
+        "type": "object"
+      },
+      "SkillVersionListResponse": {
+        "description": "List of all known immutable versions for a skill.",
+        "properties": {
+          "skill_id": {
+            "description": "Stable identifier of the skill.",
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "versions": {
+            "description": "Published versions in deterministic reverse chronological order.",
+            "items": {
+              "$ref": "#/components/schemas/SkillVersionSummaryResponse"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "skill_id",
+          "versions"
+        ],
+        "title": "SkillVersionListResponse",
+        "type": "object"
+      },
+      "SkillVersionSummaryResponse": {
+        "description": "Summary view for one immutable skill version in a list response.",
+        "properties": {
+          "artifact_metadata": {
+            "$ref": "#/components/schemas/ArtifactMetadataResponse",
+            "description": "Location and size metadata for the immutable artifact."
+          },
+          "checksum": {
+            "$ref": "#/components/schemas/ChecksumResponse",
+            "description": "Checksum metadata for the artifact."
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/SkillManifest",
+            "description": "Validated manifest for the listed version."
+          },
+          "published_at": {
+            "description": "UTC timestamp when the version was published.",
+            "format": "date-time",
+            "title": "Published At",
+            "type": "string"
+          },
+          "skill_id": {
+            "description": "Stable identifier of the skill.",
+            "title": "Skill Id",
+            "type": "string"
+          },
+          "version": {
+            "description": "Immutable semantic version of the skill.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "skill_id",
+          "version",
+          "manifest",
+          "checksum",
+          "artifact_metadata",
+          "published_at"
+        ],
+        "title": "SkillVersionSummaryResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Registry-first API for immutable skill publication, exact version retrieval, and\nversion listing.\n\nThe server owns data-local registry operations only. Prompt interpretation,\nreranking, dependency solving, final selection, lock generation, and execution\nplanning remain client-owned behavior outside this API boundary.",
+    "title": "aptitude-server Service",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/healthz": {
+      "get": {
+        "description": "Return process liveness for lightweight probes.",
+        "operationId": "get_healthz_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthzResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Healthz",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "description": "Return dependency readiness, including a database connectivity check.",
+        "operationId": "get_readyz_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyzResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Readyz",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/skills/publish": {
+      "post": {
+        "description": "Accept multipart form data containing a JSON `manifest` string and a binary `artifact` upload. The manifest is validated at the API boundary, converted to core domain models, and persisted only if the same `skill_id@version` does not already exist.",
+        "operationId": "publishSkillVersion",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "examples": {
+                "publish": {
+                  "summary": "Publish a new immutable skill version",
+                  "value": {
+                    "artifact": "(binary artifact upload)",
+                    "manifest": "{\"schema_version\": \"1.0\", \"skill_id\": \"python.lint\", \"version\": \"1.2.3\", \"name\": \"Python Lint\", \"description\": \"Linting skill\", \"tags\": [\"python\", \"lint\"], \"depends_on\": [{\"skill_id\": \"python.base\", \"version_constraint\": \">=1.0.0,<2.0.0\", \"optional\": true, \"markers\": [\"linux\", \"gpu\"]}], \"extends\": [{\"skill_id\": \"python.base\", \"version\": \"1.0.0\"}], \"conflicts_with\": [], \"overlaps_with\": []}"
+                  }
+                }
+              },
+              "schema": {
+                "$ref": "#/components/schemas/Body_publishSkillVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "artifact_metadata": {
+                    "relative_path": "python.lint/1.2.3/artifact.bin",
+                    "size_bytes": 123
+                  },
+                  "checksum": {
+                    "algorithm": "sha256",
+                    "digest": "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"
+                  },
+                  "manifest": {
+                    "conflicts_with": [],
+                    "depends_on": [
+                      {
+                        "markers": [
+                          "linux",
+                          "gpu"
+                        ],
+                        "optional": true,
+                        "skill_id": "python.base",
+                        "version_constraint": ">=1.0.0,<2.0.0"
+                      }
+                    ],
+                    "description": "Linting skill",
+                    "extends": [
+                      {
+                        "skill_id": "python.base",
+                        "version": "1.0.0"
+                      }
+                    ],
+                    "name": "Python Lint",
+                    "overlaps_with": [],
+                    "schema_version": "1.0",
+                    "skill_id": "python.lint",
+                    "tags": [
+                      "python",
+                      "lint"
+                    ],
+                    "version": "1.2.3"
+                  },
+                  "published_at": "2026-03-10T08:30:00Z",
+                  "skill_id": "python.lint",
+                  "version": "1.2.3"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionDetailResponse"
+                }
+              }
+            },
+            "description": "Immutable skill version published successfully."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "DUPLICATE_SKILL_VERSION",
+                    "details": {
+                      "skill_id": "python.lint",
+                      "version": "1.2.3"
+                    },
+                    "message": "Skill version already exists: python.lint@1.2.3"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested immutable `skill_id@version` already exists."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_manifest": {
+                    "value": {
+                      "error": {
+                        "code": "INVALID_MANIFEST",
+                        "details": {
+                          "errors": [
+                            {
+                              "input": "not-json",
+                              "loc": [],
+                              "msg": "Invalid JSON: expected value at line 1 column 1",
+                              "type": "json_invalid"
+                            }
+                          ]
+                        },
+                        "message": "Manifest validation failed."
+                      }
+                    }
+                  },
+                  "invalid_request": {
+                    "value": {
+                      "error": {
+                        "code": "INVALID_REQUEST",
+                        "details": {
+                          "errors": [
+                            {
+                              "input": "latest",
+                              "loc": [
+                                "path",
+                                "version"
+                              ],
+                              "msg": "String should match pattern",
+                              "type": "string_pattern_mismatch"
+                            }
+                          ]
+                        },
+                        "message": "Request validation failed."
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request is invalid or the manifest JSON violates the publish contract."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "ARTIFACT_STORAGE_FAILURE",
+                    "message": "Artifact storage failed during publish."
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Artifact persistence failed while publishing the version."
+          }
+        },
+        "summary": "Publish an immutable skill version",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/skills/{skill_id}": {
+      "get": {
+        "description": "Return every published immutable version for `skill_id`. Results are deterministic and ordered newest-first by publication timestamp.",
+        "operationId": "listSkillVersions",
+        "parameters": [
+          {
+            "description": "Stable identifier of the skill whose versions should be listed.",
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "description": "Stable identifier of the skill whose versions should be listed.",
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,127})$",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "skill_id": "python.lint",
+                  "versions": [
+                    {
+                      "artifact_metadata": {
+                        "relative_path": "python.lint/1.2.3/artifact.bin",
+                        "size_bytes": 123
+                      },
+                      "checksum": {
+                        "algorithm": "sha256",
+                        "digest": "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"
+                      },
+                      "manifest": {
+                        "conflicts_with": [],
+                        "depends_on": [
+                          {
+                            "markers": [
+                              "linux",
+                              "gpu"
+                            ],
+                            "optional": true,
+                            "skill_id": "python.base",
+                            "version_constraint": ">=1.0.0,<2.0.0"
+                          }
+                        ],
+                        "description": "Linting skill",
+                        "extends": [
+                          {
+                            "skill_id": "python.base",
+                            "version": "1.0.0"
+                          }
+                        ],
+                        "name": "Python Lint",
+                        "overlaps_with": [],
+                        "schema_version": "1.0",
+                        "skill_id": "python.lint",
+                        "tags": [
+                          "python",
+                          "lint"
+                        ],
+                        "version": "1.2.3"
+                      },
+                      "published_at": "2026-03-10T08:30:00Z",
+                      "skill_id": "python.lint",
+                      "version": "1.2.3"
+                    },
+                    {
+                      "artifact_metadata": {
+                        "relative_path": "python.lint/1.0.0/artifact.bin",
+                        "size_bytes": 98
+                      },
+                      "checksum": {
+                        "algorithm": "sha256",
+                        "digest": "2d711642b726b04401627ca9fbac32f5da7e5a3d4f2e9ce1d49f6b2e5f3b1f9d"
+                      },
+                      "manifest": {
+                        "conflicts_with": [],
+                        "depends_on": [],
+                        "description": "Linting skill",
+                        "extends": [],
+                        "name": "Python Lint",
+                        "overlaps_with": [],
+                        "schema_version": "1.0",
+                        "skill_id": "python.lint",
+                        "tags": [
+                          "python",
+                          "lint"
+                        ],
+                        "version": "1.0.0"
+                      },
+                      "published_at": "2026-02-10T08:30:00Z",
+                      "skill_id": "python.lint",
+                      "version": "1.0.0"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionListResponse"
+                }
+              }
+            },
+            "description": "Published versions listed successfully."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "details": {
+                      "errors": [
+                        {
+                          "input": "latest",
+                          "loc": [
+                            "path",
+                            "version"
+                          ],
+                          "msg": "String should match pattern",
+                          "type": "string_pattern_mismatch"
+                        }
+                      ]
+                    },
+                    "message": "Request validation failed."
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request payload, form fields, path parameters, or query parameters are invalid."
+          }
+        },
+        "summary": "List published versions for a skill",
+        "tags": [
+          "skills"
+        ]
+      }
+    },
+    "/skills/{skill_id}/{version}": {
+      "get": {
+        "description": "Return the stored manifest, artifact metadata, checksum, and the artifact itself as a base64-encoded string. The core service verifies the artifact checksum on every read and fails the request if integrity validation fails.",
+        "operationId": "getSkillVersion",
+        "parameters": [
+          {
+            "description": "Stable identifier of the skill to fetch.",
+            "in": "path",
+            "name": "skill_id",
+            "required": true,
+            "schema": {
+              "description": "Stable identifier of the skill to fetch.",
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,127})$",
+              "title": "Skill Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact immutable semantic version to fetch.",
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "description": "Exact immutable semantic version to fetch.",
+              "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "artifact_base64": "YmluYXJ5LWFydGlmYWN0",
+                  "artifact_metadata": {
+                    "relative_path": "python.lint/1.2.3/artifact.bin",
+                    "size_bytes": 123
+                  },
+                  "checksum": {
+                    "algorithm": "sha256",
+                    "digest": "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"
+                  },
+                  "manifest": {
+                    "conflicts_with": [],
+                    "depends_on": [
+                      {
+                        "markers": [
+                          "linux",
+                          "gpu"
+                        ],
+                        "optional": true,
+                        "skill_id": "python.base",
+                        "version_constraint": ">=1.0.0,<2.0.0"
+                      }
+                    ],
+                    "description": "Linting skill",
+                    "extends": [
+                      {
+                        "skill_id": "python.base",
+                        "version": "1.0.0"
+                      }
+                    ],
+                    "name": "Python Lint",
+                    "overlaps_with": [],
+                    "schema_version": "1.0",
+                    "skill_id": "python.lint",
+                    "tags": [
+                      "python",
+                      "lint"
+                    ],
+                    "version": "1.2.3"
+                  },
+                  "published_at": "2026-03-10T08:30:00Z",
+                  "skill_id": "python.lint",
+                  "version": "1.2.3"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionFetchResponse"
+                }
+              }
+            },
+            "description": "Immutable skill version fetched successfully."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "SKILL_VERSION_NOT_FOUND",
+                    "details": {
+                      "skill_id": "python.lint",
+                      "version": "9.9.9"
+                    },
+                    "message": "Skill version not found: python.lint@9.9.9"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested immutable `skill_id@version` does not exist."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "details": {
+                      "errors": [
+                        {
+                          "input": "latest",
+                          "loc": [
+                            "path",
+                            "version"
+                          ],
+                          "msg": "String should match pattern",
+                          "type": "string_pattern_mismatch"
+                        }
+                      ]
+                    },
+                    "message": "Request validation failed."
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request payload, form fields, path parameters, or query parameters are invalid."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "examples": {
+                  "artifact_storage_failure": {
+                    "value": {
+                      "error": {
+                        "code": "ARTIFACT_STORAGE_FAILURE",
+                        "message": "Artifact storage failed during publish."
+                      }
+                    }
+                  },
+                  "integrity_check_failed": {
+                    "value": {
+                      "error": {
+                        "code": "INTEGRITY_CHECK_FAILED",
+                        "details": {
+                          "skill_id": "python.lint",
+                          "version": "1.2.3"
+                        },
+                        "message": "Integrity check failed for skill version: python.lint@1.2.3"
+                      }
+                    }
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Artifact retrieval or integrity verification failed."
+          }
+        },
+        "summary": "Fetch one immutable skill version",
+        "tags": [
+          "skills"
+        ]
+      }
+    }
+  }
+}

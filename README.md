@@ -21,29 +21,29 @@ instead of crawling the full catalog.
 
 ## What It Does Not Own
 
-`aptitude-server` is not the resolver runtime.
+`aptitude-server` is not the client runtime.
 Prompt interpretation, reranking, dependency solving, lock generation, and
-execution planning belong to the client-side resolver.
+execution planning belong to the client-side runtime.
 
 Use this rule consistently:
 
 - Server owns data-local work
-- Resolver owns decision-local work
+- Client owns decision-local work
 
 In practice, that means the server behaves more like a package registry, while
-the resolver behaves more like the package manager and runtime planner.
+the client behaves more like the package manager and runtime planner.
 
 ## How It Fits Together
 
 ```text
 User / Agent
-  -> Resolver / Client
+  -> Client
   -> aptitude-server
   -> PostgreSQL + artifact storage + audit log
 ```
 
 The server keeps immutable records and exposes stable registry APIs.
-The resolver uses those APIs to retrieve candidates, choose versions, solve
+The client uses those APIs to retrieve candidates, choose versions, solve
 dependencies, and build reproducible lock output.
 
 ## Current Scope
@@ -80,8 +80,14 @@ Planned but not yet implemented:
 
 - `GET /skills/search`
 
+Search remains a future discovery API for candidate generation only. When it is
+added, prompt interpretation, reranking, final selection, dependency solving,
+and execution planning will remain client-owned responsibilities.
+
 When the service is running locally, OpenAPI docs are available at
 `http://127.0.0.1:8000/docs`.
+The pinned standalone OpenAPI contract for the current v1 surface is committed at
+`docs/openapi/repository-api-v1.json`.
 
 ## Tech At A Glance
 

@@ -9,23 +9,23 @@ This changelog documents implementation alignment for [.agents/plans/03-determin
 - Exact version reads preserve authored ordering and omit unset dependency fields by storing the raw manifest JSON and using response models with unset-field exclusion. See [app/core/skill_registry.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/core/skill_registry.py) and [app/interface/api/skills.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/interface/api/skills.py).
 - Publish-time edge projection for `depends_on` and `extends` is implemented in [app/persistence/skill_registry_repository.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/skill_registry_repository.py) and materialized in [app/persistence/models/skill_relationship_edge.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/models/skill_relationship_edge.py).
 - Alembic migration `0003` creates the relationship-edge read model and backfills existing manifest data, while preserving authored selector text in `target_version_selector`. See [alembic/versions/0003_deterministic_dependency_resolution.py](/Users/yonatan/Dev/Aptitude/aptitude-server/alembic/versions/0003_deterministic_dependency_resolution.py).
-- Resolver-owned routes and persistence concepts remain absent and are guarded by [tests/unit/test_registry_api_boundary.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/unit/test_registry_api_boundary.py).
+- Client-owned routes and persistence concepts remain absent and are guarded by [tests/unit/test_registry_api_boundary.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/unit/test_registry_api_boundary.py).
 
 ## Architecture Snapshot
 
 ```mermaid
 flowchart LR
-    Client["Publisher / Resolver"] --> API["Skills API<br/>validated manifest contract"]
+    Client["Publisher / Client Runtime"] --> API["Skills API<br/>validated manifest contract"]
     API --> Core["SkillRegistryService<br/>preserve authored manifest"]
     Core --> Repo["SQLAlchemySkillRegistryRepository"]
     Repo --> Version["skill_versions.manifest_json"]
     Repo --> Edge["skill_relationship_edges"]
-    Edge --> Resolver["Resolver reads exact metadata<br/>and solves locally"]
+    Edge --> ClientRuntime["Client reads exact metadata<br/>and solves locally"]
 ```
 
 Why this shape:
 - The server publishes immutable dependency metadata and a derived edge read model, but it never becomes the source of truth for solved dependency closure. See [app/persistence/skill_registry_repository.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/persistence/skill_registry_repository.py) and [tests/unit/test_registry_api_boundary.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/unit/test_registry_api_boundary.py).
-- Authored manifests are preserved verbatim enough to keep resolver-facing reads deterministic across repeated requests. See [app/core/skill_registry.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/core/skill_registry.py) and [tests/integration/test_skill_registry_endpoints.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/integration/test_skill_registry_endpoints.py).
+- Authored manifests are preserved verbatim enough to keep client-facing reads deterministic across repeated requests. See [app/core/skill_registry.py](/Users/yonatan/Dev/Aptitude/aptitude-server/app/core/skill_registry.py) and [tests/integration/test_skill_registry_endpoints.py](/Users/yonatan/Dev/Aptitude/aptitude-server/tests/integration/test_skill_registry_endpoints.py).
 
 ## Runtime Flow
 
@@ -66,7 +66,7 @@ Sources: [app/interface/api/skills.py](/Users/yonatan/Dev/Aptitude/aptitude-serv
 | --- | --- | --- | --- | --- |
 | `skill_id` | `string` | No | Pattern `SKILL_ID_PATTERN` | Names the direct dependency being declared by the publisher. |
 | `version` | `string` | Yes | Semver; mutually exclusive with `version_constraint` | Represents an exact immutable dependency pin when the author wants no range semantics. |
-| `version_constraint` | `string` | Yes | Comparator list such as `>=1.0.0,<2.0.0`; mutually exclusive with `version` | Preserves the authored direct constraint contract for resolver-side solving. |
+| `version_constraint` | `string` | Yes | Comparator list such as `>=1.0.0,<2.0.0`; mutually exclusive with `version` | Preserves the authored direct constraint contract for client-side solving. |
 | `optional` | `boolean` | Yes | Unset fields omitted from response | Flags that the dependency is optional metadata rather than an unconditional hard requirement. |
 | `markers` | `string[]` | Yes | Token validation via `MARKER_PATTERN` | Carries authored environment or policy markers without turning them into server-side execution logic. |
 

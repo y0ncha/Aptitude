@@ -1,7 +1,7 @@
 # Plan 03 — Deterministic Dependency Metadata Contracts
 
 ## Goal
-Provide deterministic, resolver-consumable dependency metadata contracts as immutable inputs to client-side dependency solving.
+Provide deterministic, client-consumable dependency metadata contracts as immutable inputs to client-side dependency solving.
 
 ## Stack Alignment
 - Runtime: Python 3.12+
@@ -18,8 +18,8 @@ Provide deterministic, resolver-consumable dependency metadata contracts as immu
 - Explicitly exclude transitive graph solving, canonical graph traversal as source of truth, lock generation, bundle assembly, and execution planning.
 
 ## Architecture Impact
-- Clarifies server/resolver responsibility boundaries at contract level.
-- Increases compatibility guarantees for resolver deterministic solving and lock replay.
+- Clarifies server/client responsibility boundaries at contract level.
+- Increases compatibility guarantees for client deterministic solving and lock replay.
 - Prevents compute-heavy solver logic from leaking into repository service.
 
 ## Deliverables
@@ -35,7 +35,7 @@ Provide deterministic, resolver-consumable dependency metadata contracts as immu
 - No server endpoint returns canonical solved dependency closure.
 
 ## Test Plan
-- Contract tests validating dependency envelope shape against resolver fixtures.
+- Contract tests validating dependency envelope shape against client fixtures.
 - Negative tests for malformed constraints and invalid dependency declarations.
 - Snapshot tests verifying deterministic dependency serialization.
 - Boundary test proving solver-owned behavior is absent from server API surface.

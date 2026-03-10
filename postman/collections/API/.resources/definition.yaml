@@ -4,7 +4,7 @@
 
 $kind: collection
 
-name: Aptitude Skills API
+name: API
 description: |-
   Collection for validating the Aptitude Skills API with two focused flows:
 
@@ -29,9 +29,9 @@ variables:
 
 scripts:
   - type: http:beforeRequest
-    language: text/javascript
-    code: |-
+    code: >-
       const requestName = pm.info.requestName || '';
+
       const sanityRequestNames = new Set([
         'Healthz',
         'Readyz',
@@ -40,6 +40,7 @@ scripts:
         'Fetch Published Skill',
         'List Published Skill Versions',
       ]);
+
 
       const buildManifest = ({ skillId, version }) =>
         JSON.stringify(
@@ -78,9 +79,11 @@ scripts:
         return skillId;
       };
 
+
       if (sanityRequestNames.has(requestName)) {
         ensureSanityIdentity(requestName === 'Publish Skill v1');
       }
+
 
       if (requestName === 'Publish Skill v1') {
         pm.collectionVariables.set(
@@ -92,6 +95,7 @@ scripts:
         );
       }
 
+
       if (requestName === 'Publish Skill v2') {
         pm.collectionVariables.set(
           'sanity_manifest',
@@ -101,6 +105,7 @@ scripts:
           }),
         );
       }
+
 
       if (requestName === 'Publish Invalid Manifest') {
         pm.collectionVariables.set(
@@ -118,3 +123,4 @@ scripts:
           ),
         );
       }
+    language: text/javascript

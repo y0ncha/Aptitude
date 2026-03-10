@@ -72,6 +72,16 @@ def _publish(
     return response.json()
 
 
+def _assert_invalid_request(response: object, *, location: list[str] | None = None) -> None:
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "INVALID_REQUEST"
+    assert body["error"]["message"] == "Request validation failed."
+    assert isinstance(body["error"]["details"]["errors"], list)
+    if location is not None:
+        assert body["error"]["details"]["errors"][0]["loc"] == location
+
+
 @pytest.mark.integration
 def test_publish_fetch_and_list_skill_versions(
     monkeypatch: pytest.MonkeyPatch,
@@ -272,3 +282,92 @@ def test_publish_rejects_invalid_dependency_constraint_syntax(
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_MANIFEST"
+
+
+@pytest.mark.integration
+def test_fetch_rejects_invalid_skill_id_path(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    monkeypatch.setenv("ARTIFACT_ROOT_DIR", str(tmp_path / "artifacts"))
+
+    with TestClient(create_app()) as client:
+        response = client.get("/skills/invalid%20skill/1.0.0")
+
+    _assert_invalid_request(response, location=["path", "skill_id"])
+
+
+@pytest.mark.integration
+def test_fetch_rejects_invalid_version_path(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    monkeypatch.setenv("ARTIFACT_ROOT_DIR", str(tmp_path / "artifacts"))
+
+    with TestClient(create_app()) as client:
+        response = client.get("/skills/python.lint/latest")
+
+    _assert_invalid_request(response, location=["path", "version"])
+
+
+@pytest.mark.integration
+def test_publish_rejects_missing_manifest_form_field(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    monkeypatch.setenv("ARTIFACT_ROOT_DIR", str(tmp_path / "artifacts"))
+
+    with TestClient(create_app()) as client:
+        response = client.post(
+            "/skills/publish",
+            files={"artifact": ("artifact.bin", b"v1", "application/octet-stream")},
+        )
+
+    _assert_invalid_request(response, location=["body", "manifest"])
+
+
+@pytest.mark.integration
+def test_publish_rejects_missing_artifact_upload(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    monkeypatch.setenv("ARTIFACT_ROOT_DIR", str(tmp_path / "artifacts"))
+
+    with TestClient(create_app()) as client:
+        response = client.post(
+            "/skills/publish",
+            data={"manifest": json.dumps(_manifest(skill_id="python.lint", version="1.0.0"))},
+        )
+
+    _assert_invalid_request(response, location=["body", "artifact"])
+
+
+@pytest.mark.integration
+def test_publish_rejects_malformed_manifest_json(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    monkeypatch.setenv("ARTIFACT_ROOT_DIR", str(tmp_path / "artifacts"))
+
+    with TestClient(create_app()) as client:
+        response = client.post(
+            "/skills/publish",
+            data={"manifest": "not-json"},
+            files={"artifact": ("artifact.bin", b"v1", "application/octet-stream")},
+        )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "INVALID_MANIFEST"
+    assert body["error"]["message"] == "Manifest validation failed."
+    assert body["error"]["details"]["errors"][0]["type"] == "json_invalid"

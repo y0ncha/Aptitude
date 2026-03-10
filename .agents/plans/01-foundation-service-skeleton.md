@@ -19,7 +19,7 @@ Establish a runnable Python service (FastAPI) with clear layer boundaries, confi
 ## Architecture Impact
 - Introduces the server interface boundary and dependency direction.
 - Sets persistence and observability foundations without domain behavior.
-- Protects long-term separation between repository and resolver responsibilities.
+- Protects long-term separation between server and client responsibilities.
 
 ## Deliverables
 - Python service skeleton (`app/main.py` + `app/...` layout).
@@ -34,7 +34,7 @@ Establish a runnable Python service (FastAPI) with clear layer boundaries, confi
 - PostgreSQL migrations run successfully on a clean setup.
 - Health endpoints return expected status.
 - `pytest` passes.
-- Architecture checks fail if new server routes include resolver-owned semantics (`/resolve`, lock execution planning).
+- Architecture checks fail if new server routes include client-owned semantics (`/resolve`, `/solve`, lock generation, or execution planning).
 
 ## Test Plan
 - Unit tests for config validation.

@@ -24,7 +24,6 @@ File overview:
 from __future__ import annotations
 
 import base64
-import json
 from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, Path, UploadFile, status
@@ -43,14 +42,26 @@ from app.core.skill_registry import (
     SkillVersionDetail,
     SkillVersionNotFoundError,
 )
+from app.interface.api.errors import error_response, serialize_validation_errors
+from app.interface.dto.errors import ErrorEnvelope
+from app.interface.dto.examples import (
+    ARTIFACT_STORAGE_FAILURE_ERROR_EXAMPLE,
+    DUPLICATE_SKILL_VERSION_ERROR_EXAMPLE,
+    FETCH_SUCCESS_EXAMPLE,
+    INTEGRITY_CHECK_FAILED_ERROR_EXAMPLE,
+    INVALID_MANIFEST_ERROR_EXAMPLE,
+    INVALID_REQUEST_ERROR_EXAMPLE,
+    LIST_SUCCESS_EXAMPLE,
+    PUBLISH_MULTIPART_FORM_EXAMPLE,
+    PUBLISH_SUCCESS_EXAMPLE,
+    SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
+)
 from app.interface.dto.skills import (
     SEMVER_PATTERN,
     SKILL_ID_PATTERN,
     ArtifactMetadataResponse,
     ChecksumResponse,
     DependencyDeclaration,
-    ErrorBody,
-    ErrorEnvelope,
     RelationshipRef,
     SkillManifest,
     SkillVersionDetailResponse,
@@ -70,37 +81,83 @@ router = APIRouter(tags=["skills"])
 # HTTP status codes or string keys such as "default".
 OpenAPIResponses = dict[int | str, dict[str, Any]]
 
-# Shared OpenAPI error documentation for the publish endpoint.
-PUBLISH_ERROR_RESPONSES: OpenAPIResponses = {
+REQUEST_VALIDATION_ERROR_RESPONSE: OpenAPIResponses = {
+    status.HTTP_422_UNPROCESSABLE_CONTENT: {
+        "model": ErrorEnvelope,
+        "description": (
+            "The request payload, form fields, path parameters, or query parameters are "
+            "invalid."
+        ),
+        "content": {"application/json": {"example": INVALID_REQUEST_ERROR_EXAMPLE}},
+    }
+}
+
+PUBLISH_RESPONSES: OpenAPIResponses = {
+    status.HTTP_201_CREATED: {
+        "description": "Immutable skill version published successfully.",
+        "content": {"application/json": {"example": PUBLISH_SUCCESS_EXAMPLE}},
+    },
     status.HTTP_409_CONFLICT: {
         "model": ErrorEnvelope,
         "description": "The requested immutable `skill_id@version` already exists.",
+        "content": {"application/json": {"example": DUPLICATE_SKILL_VERSION_ERROR_EXAMPLE}},
     },
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
         "model": ErrorEnvelope,
-        "description": "The manifest JSON is malformed or violates the manifest contract.",
+        "description": "The request is invalid or the manifest JSON violates the publish contract.",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "invalid_request": {"value": INVALID_REQUEST_ERROR_EXAMPLE},
+                    "invalid_manifest": {"value": INVALID_MANIFEST_ERROR_EXAMPLE},
+                }
+            }
+        },
     },
     status.HTTP_500_INTERNAL_SERVER_ERROR: {
         "model": ErrorEnvelope,
         "description": "Artifact persistence failed while publishing the version.",
+        "content": {"application/json": {"example": ARTIFACT_STORAGE_FAILURE_ERROR_EXAMPLE}},
     },
 }
 
-# Shared OpenAPI error documentation for the fetch endpoint.
-FETCH_ERROR_RESPONSES: OpenAPIResponses = {
+FETCH_RESPONSES: OpenAPIResponses = {
+    status.HTTP_200_OK: {
+        "description": "Immutable skill version fetched successfully.",
+        "content": {"application/json": {"example": FETCH_SUCCESS_EXAMPLE}},
+    },
+    **REQUEST_VALIDATION_ERROR_RESPONSE,
     status.HTTP_404_NOT_FOUND: {
         "model": ErrorEnvelope,
         "description": "The requested immutable `skill_id@version` does not exist.",
+        "content": {"application/json": {"example": SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE}},
     },
     status.HTTP_500_INTERNAL_SERVER_ERROR: {
         "model": ErrorEnvelope,
         "description": "Artifact retrieval or integrity verification failed.",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "integrity_check_failed": {"value": INTEGRITY_CHECK_FAILED_ERROR_EXAMPLE},
+                    "artifact_storage_failure": {"value": ARTIFACT_STORAGE_FAILURE_ERROR_EXAMPLE},
+                }
+            }
+        },
     },
+}
+
+LIST_RESPONSES: OpenAPIResponses = {
+    status.HTTP_200_OK: {
+        "description": "Published versions listed successfully.",
+        "content": {"application/json": {"example": LIST_SUCCESS_EXAMPLE}},
+    },
+    **REQUEST_VALIDATION_ERROR_RESPONSE,
 }
 
 
 @router.post(
     "/skills/publish",
+    operation_id="publishSkillVersion",
     summary="Publish an immutable skill version",
     description=(
         "Accept multipart form data containing a JSON `manifest` string and a binary "
@@ -111,7 +168,21 @@ FETCH_ERROR_RESPONSES: OpenAPIResponses = {
     response_model=SkillVersionDetailResponse,
     response_model_exclude_unset=True,
     status_code=status.HTTP_201_CREATED,
-    responses=PUBLISH_ERROR_RESPONSES,
+    responses=PUBLISH_RESPONSES,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "multipart/form-data": {
+                    "examples": {
+                        "publish": {
+                            "summary": "Publish a new immutable skill version",
+                            "value": PUBLISH_MULTIPART_FORM_EXAMPLE,
+                        }
+                    }
+                }
+            }
+        }
+    },
 )
 async def publish_skill_version(
     manifest: Annotated[
@@ -167,7 +238,7 @@ async def _publish_from_payload(
         return _to_detail_response(stored=stored)
     except ValidationError as exc:
         # Pydantic validation failure at the API boundary.
-        return _error_response(
+        return error_response(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             code="INVALID_MANIFEST",
             message="Manifest validation failed.",
@@ -175,14 +246,14 @@ async def _publish_from_payload(
         )
     except InvalidManifestError as exc:
         # Domain-level manifest rejection from the core service.
-        return _error_response(
+        return error_response(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             code="INVALID_MANIFEST",
             message=str(exc),
         )
     except DuplicateSkillVersionError as exc:
         # Immutable publish conflict: the exact skill_id/version already exists.
-        return _error_response(
+        return error_response(
             status_code=status.HTTP_409_CONFLICT,
             code="DUPLICATE_SKILL_VERSION",
             message=str(exc),
@@ -190,7 +261,7 @@ async def _publish_from_payload(
         )
     except ArtifactStorageFailureError as exc:
         # Persistence/storage failure while writing the artifact.
-        return _error_response(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             code="ARTIFACT_STORAGE_FAILURE",
             message=str(exc),
@@ -199,6 +270,7 @@ async def _publish_from_payload(
 
 @router.get(
     "/skills/{skill_id}/{version}",
+    operation_id="getSkillVersion",
     summary="Fetch one immutable skill version",
     description=(
         "Return the stored manifest, artifact metadata, checksum, and the artifact "
@@ -207,7 +279,7 @@ async def _publish_from_payload(
     ),
     response_model=SkillVersionFetchResponse,
     response_model_exclude_unset=True,
-    responses=FETCH_ERROR_RESPONSES,
+    responses=FETCH_RESPONSES,
 )
 def get_skill_version(
     skill_id: Annotated[
@@ -254,7 +326,7 @@ def _fetch_skill_version(
         stored = registry_service.get_version(skill_id=skill_id, version=version)
         return _to_fetch_response(stored=stored)
     except SkillVersionNotFoundError as exc:
-        return _error_response(
+        return error_response(
             status_code=status.HTTP_404_NOT_FOUND,
             code="SKILL_VERSION_NOT_FOUND",
             message=str(exc),
@@ -262,14 +334,14 @@ def _fetch_skill_version(
         )
     except IntegrityCheckFailedError as exc:
         # Raised when the stored artifact no longer matches its recorded checksum.
-        return _error_response(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             code="INTEGRITY_CHECK_FAILED",
             message=str(exc),
             details={"skill_id": exc.skill_id, "version": exc.version},
         )
     except ArtifactStorageFailureError as exc:
-        return _error_response(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             code="ARTIFACT_STORAGE_FAILURE",
             message=str(exc),
@@ -278,6 +350,7 @@ def _fetch_skill_version(
 
 @router.get(
     "/skills/{skill_id}",
+    operation_id="listSkillVersions",
     summary="List published versions for a skill",
     description=(
         "Return every published immutable version for `skill_id`. Results are "
@@ -285,6 +358,7 @@ def _fetch_skill_version(
     ),
     response_model=SkillVersionListResponse,
     response_model_exclude_unset=True,
+    responses=LIST_RESPONSES,
 )
 def list_skill_versions(
     skill_id: Annotated[
@@ -351,7 +425,7 @@ def _validation_errors(exc: ValidationError) -> list[dict[str, Any]]:
     ``ctx.error`` for custom validators, which breaks JSON serialization.
     Pydantic's JSON serializer already normalizes those values to strings.
     """
-    return json.loads(exc.json())
+    return serialize_validation_errors(exc)
 
 
 def _to_manifest_data(manifest: SkillManifest) -> SkillManifestData:
@@ -450,21 +524,3 @@ def _to_fetch_response(*, stored: SkillVersionDetail) -> SkillVersionFetchRespon
         published_at=stored.published_at,
         artifact_base64=base64.b64encode(stored.artifact_bytes).decode("ascii"),
     )
-
-
-def _error_response(
-    *,
-    status_code: int,
-    code: str,
-    message: str,
-    details: dict[str, Any] | None = None,
-) -> JSONResponse:
-    """Return the stable JSON error envelope used by this router.
-
-    Keeping all error construction in one helper ensures:
-    - the same envelope shape across endpoints
-    - consistent JSON serialization behavior
-    - stable machine-readable error codes for clients
-    """
-    payload = ErrorEnvelope(error=ErrorBody(code=code, message=message, details=details))
-    return JSONResponse(status_code=status_code, content=payload.model_dump(mode="json"))
