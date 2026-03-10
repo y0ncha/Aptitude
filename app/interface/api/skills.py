@@ -64,7 +64,7 @@ from app.interface.dto.skills import (
 router = APIRouter(tags=["skills"])
 
 
-#===== OpenAPI schemas and shared response metadata =====#
+# ===== OpenAPI schemas and shared response metadata =====#
 
 # FastAPI expects route-level OpenAPI response metadata to allow either integer
 # HTTP status codes or string keys such as "default".
