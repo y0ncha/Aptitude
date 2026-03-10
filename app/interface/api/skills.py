@@ -85,8 +85,7 @@ REQUEST_VALIDATION_ERROR_RESPONSE: OpenAPIResponses = {
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
         "model": ErrorEnvelope,
         "description": (
-            "The request payload, form fields, path parameters, or query parameters are "
-            "invalid."
+            "The request payload, form fields, path parameters, or query parameters are invalid."
         ),
         "content": {"application/json": {"example": INVALID_REQUEST_ERROR_EXAMPLE}},
     }

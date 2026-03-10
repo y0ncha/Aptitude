@@ -6,9 +6,11 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import cast
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from starlette.types import ExceptionHandler
 
 from app.audit.recorder import SQLAlchemyAuditRecorder
 from app.core.logging import build_logging_config, configure_logging
@@ -87,7 +89,10 @@ def create_app() -> FastAPI:
     app.state.readiness_service = ReadinessService(
         database_probe=SQLAlchemyDatabaseReadinessProbe(),
     )
-    app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
+    app.add_exception_handler(
+        RequestValidationError,
+        cast(ExceptionHandler, request_validation_exception_handler),
+    )
     app.include_router(health_router)
     app.include_router(skills_router)
     return app
