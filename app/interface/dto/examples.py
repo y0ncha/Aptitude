@@ -20,6 +20,14 @@ PUBLISH_REQUEST_EXAMPLE = {
         "maturity_score": 0.9,
         "security_score": 0.95,
     },
+    "governance": {
+        "trust_tier": "internal",
+        "provenance": {
+            "repo_url": "https://github.com/example/skills",
+            "commit_sha": "aabbccddeeff00112233445566778899aabbccdd",
+            "tree_path": "skills/python.lint",
+        },
+    },
     "relationships": {
         "depends_on": [
             {
@@ -60,6 +68,13 @@ SKILL_VERSION_RESPONSE_EXAMPLE = {
         "maturity_score": 0.9,
         "security_score": 0.95,
     },
+    "lifecycle_status": "published",
+    "trust_tier": "internal",
+    "provenance": {
+        "repo_url": "https://github.com/example/skills",
+        "commit_sha": "aabbccddeeff00112233445566778899aabbccdd",
+        "tree_path": "skills/python.lint",
+    },
     "relationships": {
         "depends_on": [
             {
@@ -81,6 +96,8 @@ SKILL_VERSION_RESPONSE_EXAMPLE = {
                     "name": "Python Base",
                     "description": "Base runtime skill",
                     "tags": ["python", "runtime"],
+                    "lifecycle_status": "published",
+                    "trust_tier": "verified",
                     "published_at": "2026-03-01T08:30:00Z",
                 },
             }
@@ -102,6 +119,8 @@ SKILL_IDENTITY_SUCCESS_EXAMPLE = {
     "status": "published",
     "current_version": {
         "version": "1.2.3",
+        "lifecycle_status": "published",
+        "trust_tier": "internal",
         "published_at": "2026-03-10T08:30:00Z",
     },
     "created_at": "2026-02-10T08:30:00Z",
@@ -125,6 +144,8 @@ LIST_SUCCESS_EXAMPLE = {
                 "description": "Linting skill",
                 "tags": ["python", "lint"],
             },
+            "lifecycle_status": "published",
+            "trust_tier": "internal",
             "published_at": "2026-03-10T08:30:00Z",
         }
     ],
@@ -138,6 +159,8 @@ SEARCH_SUCCESS_EXAMPLE = {
             "name": "Python Lint",
             "description": "Linting skill",
             "tags": ["python", "lint"],
+            "lifecycle_status": "published",
+            "trust_tier": "internal",
             "published_at": "2026-03-10T08:30:00Z",
             "freshness_days": 0,
             "content_size_bytes": 123,
@@ -174,6 +197,8 @@ RELATIONSHIP_BATCH_SUCCESS_EXAMPLE = {
                         "name": "Python Base",
                         "description": "Base runtime skill",
                         "tags": ["python", "runtime"],
+                        "lifecycle_status": "published",
+                        "trust_tier": "verified",
                         "published_at": "2026-03-01T08:30:00Z",
                     },
                 },
@@ -220,6 +245,8 @@ SEARCH_INVALID_REQUEST_ERROR_EXAMPLE = {
                         "language": None,
                         "fresh_within_days": None,
                         "max_content_size_bytes": None,
+                        "status": [],
+                        "trust_tier": [],
                         "limit": 20,
                     },
                 }
@@ -257,4 +284,13 @@ CONTENT_STORAGE_FAILURE_ERROR_EXAMPLE = {
         "code": "CONTENT_STORAGE_FAILURE",
         "message": "Failed to persist immutable skill version.",
     }
+}
+
+SKILL_VERSION_STATUS_RESPONSE_EXAMPLE = {
+    "slug": "python.lint",
+    "version": "1.2.3",
+    "status": "deprecated",
+    "trust_tier": "internal",
+    "lifecycle_changed_at": "2026-03-11T09:15:00Z",
+    "is_current_default": True,
 }

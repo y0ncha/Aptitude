@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal, Protocol
 
+from app.core.governance import LifecycleStatus, ProvenanceMetadata, TrustTier
+
 RelationshipEdgeType = Literal[
     "depends_on",
     "extends",
@@ -61,6 +63,14 @@ class RelationshipSelectorRecordInput:
 
 
 @dataclass(frozen=True, slots=True)
+class GovernanceRecordInput:
+    """Governance metadata persisted for one immutable version."""
+
+    trust_tier: TrustTier
+    provenance: ProvenanceMetadata | None
+
+
+@dataclass(frozen=True, slots=True)
 class CreateSkillVersionRecord:
     """Persistence payload for one immutable version creation."""
 
@@ -68,9 +78,9 @@ class CreateSkillVersionRecord:
     version: str
     content: ContentRecordInput
     metadata: MetadataRecordInput
+    governance: GovernanceRecordInput
     relationships: tuple[RelationshipSelectorRecordInput, ...]
     version_checksum_digest: str
-    legacy_manifest_json: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,9 +101,11 @@ class StoredSkillIdentity:
     """Stored logical skill identity projection."""
 
     slug: str
-    status: str
+    status: LifecycleStatus
     current_version: str | None
     current_version_published_at: datetime | None
+    current_version_status: LifecycleStatus | None
+    current_version_trust_tier: TrustTier | None
     created_at: datetime
     updated_at: datetime
 
@@ -111,6 +123,8 @@ class StoredSkillVersionSummary:
     name: str
     description: str | None
     tags: tuple[str, ...]
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
 
 
@@ -133,6 +147,10 @@ class StoredSkillVersion:
     token_estimate: int | None
     maturity_score: float | None
     security_score: float | None
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
+    provenance: ProvenanceMetadata | None
+    lifecycle_changed_at: datetime
     published_at: datetime
     relationships: tuple[StoredRelationshipSelector, ...]
 
@@ -146,6 +164,8 @@ class StoredSkillVersionContent:
     raw_markdown: str
     checksum_digest: str
     size_bytes: int
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
 
 
@@ -155,6 +175,8 @@ class StoredSkillRelationshipSource:
 
     slug: str
     version: str
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     relationships: tuple[StoredRelationshipSelector, ...]
 
 
@@ -166,6 +188,8 @@ class SearchCandidatesRequest:
     required_tags: tuple[str, ...]
     fresh_within_days: int | None
     max_content_size_bytes: int | None
+    lifecycle_statuses: tuple[LifecycleStatus, ...]
+    trust_tiers: tuple[TrustTier, ...]
     limit: int
 
 
@@ -179,6 +203,8 @@ class StoredSkillSearchCandidate:
     name: str
     description: str | None
     tags: tuple[str, ...]
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
     content_size_bytes: int
     usage_count: int
@@ -186,6 +212,18 @@ class StoredSkillSearchCandidate:
     exact_name_match: bool
     lexical_score: float
     tag_overlap_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class StoredSkillVersionStatus:
+    """Stored lifecycle update result for one immutable version."""
+
+    slug: str
+    version: str
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
+    lifecycle_changed_at: datetime
+    is_current_default: bool
 
 
 class SkillRegistryPersistenceError(RuntimeError):
@@ -206,6 +244,18 @@ class SkillRegistryPort(Protocol):
 
     def list_versions(self, *, slug: str) -> tuple[StoredSkillVersionSummary, ...]:
         """Return deterministic summaries for all versions of a skill."""
+
+    def get_version(self, *, slug: str, version: str) -> StoredSkillVersion | None:
+        """Return one immutable version for governance-aware updates."""
+
+    def update_version_status(
+        self,
+        *,
+        slug: str,
+        version: str,
+        lifecycle_status: LifecycleStatus,
+    ) -> StoredSkillVersionStatus | None:
+        """Update lifecycle state for one immutable version and return the new projection."""
 
 
 class SkillVersionReadPort(Protocol):

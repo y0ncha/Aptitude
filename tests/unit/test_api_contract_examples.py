@@ -20,6 +20,7 @@ from app.interface.dto.examples import (
     SKILL_NOT_FOUND_ERROR_EXAMPLE,
     SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
     SKILL_VERSION_RESPONSE_EXAMPLE,
+    SKILL_VERSION_STATUS_RESPONSE_EXAMPLE,
 )
 from app.interface.dto.skills import (
     SkillIdentityResponse,
@@ -28,6 +29,7 @@ from app.interface.dto.skills import (
     SkillVersionCreateRequest,
     SkillVersionListResponse,
     SkillVersionResponse,
+    SkillVersionStatusResponse,
 )
 
 
@@ -48,6 +50,7 @@ def test_publish_request_example_matches_request_contract() -> None:
         (LIST_SUCCESS_EXAMPLE, SkillVersionListResponse),
         (SEARCH_SUCCESS_EXAMPLE, SkillSearchResponse),
         (RELATIONSHIP_BATCH_SUCCESS_EXAMPLE, SkillRelationshipBatchResponse),
+        (SKILL_VERSION_STATUS_RESPONSE_EXAMPLE, SkillVersionStatusResponse),
     ],
 )
 def test_success_examples_match_response_contracts(

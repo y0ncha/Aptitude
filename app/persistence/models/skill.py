@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Text, func, text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.persistence.models.base import Base
@@ -20,18 +20,11 @@ class Skill(Base):
     __tablename__ = "skills"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    # Legacy column retained as an internal compatibility mirror during the cutover.
-    skill_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     current_version_id: Mapped[int | None] = mapped_column(
         BigInteger,
         ForeignKey("skill_versions.id", ondelete="SET NULL"),
         nullable=True,
-    )
-    status: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-        server_default=text("'published'"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

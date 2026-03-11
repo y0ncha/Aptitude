@@ -31,6 +31,8 @@ RelationshipEdgeType = Literal[
     "overlaps_with",
 ]
 BatchItemStatus = Literal["found", "not_found"]
+LifecycleStatus = Literal["published", "deprecated", "archived"]
+TrustTier = Literal["untrusted", "internal", "verified"]
 
 
 def _default_relationship_edge_types() -> list[RelationshipEdgeType]:
@@ -200,6 +202,25 @@ class SkillVersionRelationshipsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ProvenanceRequest(BaseModel):
+    """Minimal publish-time provenance metadata."""
+
+    repo_url: str = Field(min_length=1, max_length=500)
+    commit_sha: str = Field(min_length=7, max_length=64, pattern=r"^[0-9A-Fa-f]+$")
+    tree_path: str | None = Field(default=None, min_length=1, max_length=500)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SkillGovernanceRequest(BaseModel):
+    """Governance metadata supplied at publish time."""
+
+    trust_tier: TrustTier = "untrusted"
+    provenance: ProvenanceRequest | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class SkillVersionCreateRequest(BaseModel):
     """Normalized JSON publish contract."""
 
@@ -215,6 +236,7 @@ class SkillVersionCreateRequest(BaseModel):
     )
     content: SkillVersionContentRequest
     metadata: SkillVersionMetadataRequest
+    governance: SkillGovernanceRequest = Field(default_factory=SkillGovernanceRequest)
     relationships: SkillVersionRelationshipsRequest = Field(
         default_factory=SkillVersionRelationshipsRequest
     )
@@ -258,6 +280,14 @@ class SkillMetadataResponse(SkillMetadataSummaryResponse):
     security_score: float | None = None
 
 
+class ProvenanceResponse(BaseModel):
+    """Minimal provenance returned by exact version reads."""
+
+    repo_url: str
+    commit_sha: str
+    tree_path: str | None = None
+
+
 class RelationshipSelectorResponse(BaseModel):
     """Authored relationship selector preserved exactly as published."""
 
@@ -292,6 +322,8 @@ class SkillVersionReferenceResponse(BaseModel):
     name: str
     description: str | None
     tags: list[str]
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
 
 
@@ -319,6 +351,9 @@ class SkillVersionResponse(BaseModel):
     version_checksum: ChecksumResponse
     content: SkillContentSummaryResponse
     metadata: SkillMetadataResponse
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
+    provenance: ProvenanceResponse | None = None
     relationships: SkillVersionRelationshipsResponse
     published_at: datetime
     content_download_path: str
@@ -332,6 +367,8 @@ class SkillVersionSummaryResponse(BaseModel):
     version_checksum: ChecksumResponse
     content: SkillContentSummaryResponse
     metadata: SkillMetadataSummaryResponse
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
 
 
@@ -339,6 +376,8 @@ class CurrentSkillVersionResponse(BaseModel):
     """Current default version pointer for a skill identity."""
 
     version: str
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
 
 
@@ -346,7 +385,7 @@ class SkillIdentityResponse(BaseModel):
     """Logical skill identity response."""
 
     slug: str
-    status: str
+    status: LifecycleStatus
     current_version: CurrentSkillVersionResponse | None
     created_at: datetime
     updated_at: datetime
@@ -380,6 +419,14 @@ class SkillSearchRequest(BaseModel):
         ge=0,
         description="Optional maximum markdown size in bytes.",
     )
+    status: list[LifecycleStatus] = Field(
+        default_factory=list,
+        description="Repeatable lifecycle-state filter.",
+    )
+    trust_tier: list[TrustTier] = Field(
+        default_factory=list,
+        description="Repeatable trust-tier filter.",
+    )
     limit: int = Field(default=20, ge=1, le=50)
 
     @field_validator("q", "language")
@@ -403,6 +450,8 @@ class SkillSearchRequest(BaseModel):
             and self.language is None
             and self.fresh_within_days is None
             and self.max_content_size_bytes is None
+            and not self.status
+            and not self.trust_tier
         ):
             raise ValueError("At least one search selector must be provided.")
         return self
@@ -416,6 +465,8 @@ class SkillSearchResultResponse(BaseModel):
     name: str
     description: str | None
     tags: list[str]
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
     freshness_days: int
     content_size_bytes: int
@@ -429,6 +480,26 @@ class SkillSearchResponse(BaseModel):
     """Compact advisory search response."""
 
     results: list[SkillSearchResultResponse]
+
+
+class SkillVersionStatusUpdateRequest(BaseModel):
+    """Lifecycle transition request for one immutable version."""
+
+    status: LifecycleStatus
+    note: str | None = Field(default=None, max_length=1000)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SkillVersionStatusResponse(BaseModel):
+    """Lifecycle status update response."""
+
+    slug: str
+    version: str
+    status: LifecycleStatus
+    trust_tier: TrustTier
+    lifecycle_changed_at: datetime
+    is_current_default: bool
 
 
 class SkillRelationshipBatchRequest(BaseModel):

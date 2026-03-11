@@ -13,6 +13,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.types import ExceptionHandler
 
 from app.audit.recorder import SQLAlchemyAuditRecorder
+from app.core.governance import GovernancePolicy, PolicyViolation
 from app.core.logging import build_logging_config, configure_logging
 from app.core.readiness import ReadinessService
 from app.core.settings import get_settings, reset_settings_cache
@@ -21,7 +22,12 @@ from app.core.skill_fetch import SkillFetchService
 from app.core.skill_registry import SkillRegistryService
 from app.core.skill_relationships import SkillRelationshipService
 from app.interface.api.discovery import router as discovery_router
-from app.interface.api.errors import request_validation_exception_handler
+from app.interface.api.errors import (
+    ApiError,
+    api_error_exception_handler,
+    policy_violation_exception_handler,
+    request_validation_exception_handler,
+)
 from app.interface.api.fetch import router as fetch_router
 from app.interface.api.health import router as health_router
 from app.interface.api.resolution import router as resolution_router
@@ -71,20 +77,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     session_factory = get_session_factory()
     registry_repository = SQLAlchemySkillRegistryRepository(session_factory=session_factory)
     audit_recorder = SQLAlchemyAuditRecorder(session_factory=session_factory)
+    governance_policy = GovernancePolicy(profile=settings.active_policy)
     app.state.skill_registry_service = SkillRegistryService(
         registry=registry_repository,
         audit_recorder=audit_recorder,
+        governance_policy=governance_policy,
     )
     app.state.skill_discovery_service = SkillDiscoveryService(
         search_port=registry_repository,
         audit_recorder=audit_recorder,
+        governance_policy=governance_policy,
     )
     app.state.skill_fetch_service = SkillFetchService(
         version_reader=registry_repository,
+        governance_policy=governance_policy,
     )
     app.state.skill_relationship_service = SkillRelationshipService(
         relationship_reader=registry_repository,
         version_reader=registry_repository,
+        governance_policy=governance_policy,
     )
     logger.info("service startup complete")
     try:
@@ -108,6 +119,14 @@ def create_app() -> FastAPI:
     app.add_exception_handler(
         RequestValidationError,
         cast(ExceptionHandler, cast(object, request_validation_exception_handler)),
+    )
+    app.add_exception_handler(
+        ApiError,
+        cast(ExceptionHandler, cast(object, api_error_exception_handler)),
+    )
+    app.add_exception_handler(
+        PolicyViolation,
+        cast(ExceptionHandler, cast(object, policy_violation_exception_handler)),
     )
     app.include_router(health_router)
     app.include_router(discovery_router)

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from app.core.dependencies import SkillDiscoveryServiceDep
+from app.core.dependencies import ReadCallerDep, SkillDiscoveryServiceDep
 from app.core.skill_search import SkillSearchQuery
 from app.interface.api.errors import error_response
 from app.interface.api.skill_api_support import to_search_result_response, validation_errors
@@ -18,7 +18,12 @@ from app.interface.dto.examples import (
     SEARCH_INVALID_REQUEST_ERROR_EXAMPLE,
     SEARCH_SUCCESS_EXAMPLE,
 )
-from app.interface.dto.skills import SkillSearchRequest, SkillSearchResponse
+from app.interface.dto.skills import (
+    LifecycleStatus,
+    SkillSearchRequest,
+    SkillSearchResponse,
+    TrustTier,
+)
 
 router = APIRouter(tags=["discovery"])
 
@@ -59,6 +64,7 @@ SEARCH_RESPONSES: OpenAPIResponses = {
 )
 def search_skills(
     discovery_service: SkillDiscoveryServiceDep,
+    caller: ReadCallerDep,
     q: Annotated[str | None, Query(description="Full-text discovery query.")] = None,
     tag: Annotated[
         list[str] | None,
@@ -76,6 +82,14 @@ def search_skills(
         int | None,
         Query(ge=0, description="Maximum allowed markdown size in bytes."),
     ] = None,
+    lifecycle_status: Annotated[
+        list[LifecycleStatus] | None,
+        Query(alias="status", description="Repeatable lifecycle-state filter."),
+    ] = None,
+    trust_tier: Annotated[
+        list[TrustTier] | None,
+        Query(description="Repeatable trust-tier filter."),
+    ] = None,
     limit: Annotated[
         int,
         Query(ge=1, le=50, description="Maximum number of skill candidates to return."),
@@ -89,6 +103,8 @@ def search_skills(
             language=language,
             fresh_within_days=fresh_within_days,
             max_content_size_bytes=max_content_size_bytes,
+            status=lifecycle_status or [],
+            trust_tier=trust_tier or [],
             limit=limit,
         )
     except ValidationError as exc:
@@ -100,12 +116,15 @@ def search_skills(
         )
 
     results = discovery_service.search(
+        caller=caller,
         query=SkillSearchQuery(
             q=request.q,
             tags=tuple(request.tags),
             language=request.language,
             fresh_within_days=request.fresh_within_days,
             max_footprint_bytes=request.max_content_size_bytes,
+            status=tuple(request.status),
+            trust_tier=tuple(request.trust_tier),
             limit=request.limit,
         )
     )

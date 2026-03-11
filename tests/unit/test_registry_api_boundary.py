@@ -16,6 +16,7 @@ _EXPECTED_PUBLIC_PATHS = {
     "/skills/{slug}/versions",
     "/skills/{slug}/versions/{version}",
     "/skills/{slug}/versions/{version}/content",
+    "/skills/{slug}/versions/{version}/status",
 }
 _FORBIDDEN_PATHS = (
     "/resolve",

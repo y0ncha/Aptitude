@@ -25,9 +25,27 @@
       "CurrentSkillVersionResponse": {
         "description": "Current default version pointer for a skill identity.",
         "properties": {
+          "lifecycle_status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          },
           "published_at": {
             "format": "date-time",
             "title": "Published At",
+            "type": "string"
+          },
+          "trust_tier": {
+            "enum": [
+              "untrusted",
+              "internal",
+              "verified"
+            ],
+            "title": "Trust Tier",
             "type": "string"
           },
           "version": {
@@ -37,6 +55,8 @@
         },
         "required": [
           "version",
+          "lifecycle_status",
+          "trust_tier",
           "published_at"
         ],
         "title": "CurrentSkillVersionResponse",
@@ -206,6 +226,74 @@
         "title": "HealthzResponse",
         "type": "object"
       },
+      "ProvenanceRequest": {
+        "additionalProperties": false,
+        "description": "Minimal publish-time provenance metadata.",
+        "properties": {
+          "commit_sha": {
+            "maxLength": 64,
+            "minLength": 7,
+            "pattern": "^[0-9A-Fa-f]+$",
+            "title": "Commit Sha",
+            "type": "string"
+          },
+          "repo_url": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Repo Url",
+            "type": "string"
+          },
+          "tree_path": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tree Path"
+          }
+        },
+        "required": [
+          "repo_url",
+          "commit_sha"
+        ],
+        "title": "ProvenanceRequest",
+        "type": "object"
+      },
+      "ProvenanceResponse": {
+        "description": "Minimal provenance returned by exact version reads.",
+        "properties": {
+          "commit_sha": {
+            "title": "Commit Sha",
+            "type": "string"
+          },
+          "repo_url": {
+            "title": "Repo Url",
+            "type": "string"
+          },
+          "tree_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tree Path"
+          }
+        },
+        "required": [
+          "repo_url",
+          "commit_sha"
+        ],
+        "title": "ProvenanceResponse",
+        "type": "object"
+      },
       "ReadinessCheck": {
         "properties": {
           "detail": {
@@ -360,6 +448,34 @@
         "title": "SkillContentSummaryResponse",
         "type": "object"
       },
+      "SkillGovernanceRequest": {
+        "additionalProperties": false,
+        "description": "Governance metadata supplied at publish time.",
+        "properties": {
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvenanceRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trust_tier": {
+            "default": "untrusted",
+            "enum": [
+              "untrusted",
+              "internal",
+              "verified"
+            ],
+            "title": "Trust Tier",
+            "type": "string"
+          }
+        },
+        "title": "SkillGovernanceRequest",
+        "type": "object"
+      },
       "SkillIdentityResponse": {
         "description": "Logical skill identity response.",
         "properties": {
@@ -383,6 +499,11 @@
             "type": "string"
           },
           "status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -721,6 +842,15 @@
             "title": "Freshness Days",
             "type": "integer"
           },
+          "lifecycle_status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          },
           "matched_fields": {
             "items": {
               "type": "string"
@@ -762,6 +892,15 @@
             "title": "Tags",
             "type": "array"
           },
+          "trust_tier": {
+            "enum": [
+              "untrusted",
+              "internal",
+              "verified"
+            ],
+            "title": "Trust Tier",
+            "type": "string"
+          },
           "usage_count": {
             "title": "Usage Count",
             "type": "integer"
@@ -777,6 +916,8 @@
           "name",
           "description",
           "tags",
+          "lifecycle_status",
+          "trust_tier",
           "published_at",
           "freshness_days",
           "content_size_bytes",
@@ -848,6 +989,9 @@
         "properties": {
           "content": {
             "$ref": "#/components/schemas/SkillVersionContentRequest"
+          },
+          "governance": {
+            "$ref": "#/components/schemas/SkillGovernanceRequest"
           },
           "metadata": {
             "$ref": "#/components/schemas/SkillVersionMetadataRequest"
@@ -1033,6 +1177,15 @@
             ],
             "title": "Description"
           },
+          "lifecycle_status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -1053,6 +1206,15 @@
             "title": "Tags",
             "type": "array"
           },
+          "trust_tier": {
+            "enum": [
+              "untrusted",
+              "internal",
+              "verified"
+            ],
+            "title": "Trust Tier",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "string"
@@ -1064,6 +1226,8 @@
           "name",
           "description",
           "tags",
+          "lifecycle_status",
+          "trust_tier",
           "published_at"
         ],
         "title": "SkillVersionReferenceResponse",
@@ -1150,8 +1314,27 @@
             "title": "Content Download Path",
             "type": "string"
           },
+          "lifecycle_status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
+          },
           "metadata": {
             "$ref": "#/components/schemas/SkillMetadataResponse"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvenanceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "published_at": {
             "format": "date-time",
@@ -1165,6 +1348,15 @@
             "title": "Slug",
             "type": "string"
           },
+          "trust_tier": {
+            "enum": [
+              "untrusted",
+              "internal",
+              "verified"
+            ],
+            "title": "Trust Tier",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "string"
@@ -1179,6 +1371,8 @@
           "version_checksum",
           "content",
           "metadata",
+          "lifecycle_status",
+          "trust_tier",
           "relationships",
           "published_at",
           "content_download_path"
@@ -1186,11 +1380,102 @@
         "title": "SkillVersionResponse",
         "type": "object"
       },
+      "SkillVersionStatusResponse": {
+        "description": "Lifecycle status update response.",
+        "properties": {
+          "is_current_default": {
+            "title": "Is Current Default",
+            "type": "boolean"
+          },
+          "lifecycle_changed_at": {
+            "format": "date-time",
+            "title": "Lifecycle Changed At",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "trust_tier": {
+            "enum": [
+              "untrusted",
+              "internal",
+              "verified"
+            ],
+            "title": "Trust Tier",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "version",
+          "status",
+          "trust_tier",
+          "lifecycle_changed_at",
+          "is_current_default"
+        ],
+        "title": "SkillVersionStatusResponse",
+        "type": "object"
+      },
+      "SkillVersionStatusUpdateRequest": {
+        "additionalProperties": false,
+        "description": "Lifecycle transition request for one immutable version.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SkillVersionStatusUpdateRequest",
+        "type": "object"
+      },
       "SkillVersionSummaryResponse": {
         "description": "Summary view for one immutable version in version-list and batch responses.",
         "properties": {
           "content": {
             "$ref": "#/components/schemas/SkillContentSummaryResponse"
+          },
+          "lifecycle_status": {
+            "enum": [
+              "published",
+              "deprecated",
+              "archived"
+            ],
+            "title": "Lifecycle Status",
+            "type": "string"
           },
           "metadata": {
             "$ref": "#/components/schemas/SkillMetadataSummaryResponse"
@@ -1204,6 +1489,15 @@
             "title": "Slug",
             "type": "string"
           },
+          "trust_tier": {
+            "enum": [
+              "untrusted",
+              "internal",
+              "verified"
+            ],
+            "title": "Trust Tier",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "string"
@@ -1218,10 +1512,18 @@
           "version_checksum",
           "content",
           "metadata",
+          "lifecycle_status",
+          "trust_tier",
           "published_at"
         ],
         "title": "SkillVersionSummaryResponse",
         "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -1333,6 +1635,58 @@
             }
           },
           {
+            "description": "Repeatable lifecycle-state filter.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "published",
+                      "deprecated",
+                      "archived"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Repeatable lifecycle-state filter.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Repeatable trust-tier filter.",
+            "in": "query",
+            "name": "trust_tier",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "untrusted",
+                      "internal",
+                      "verified"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Repeatable trust-tier filter.",
+              "title": "Trust Tier"
+            }
+          },
+          {
             "description": "Maximum number of skill candidates to return.",
             "in": "query",
             "name": "limit",
@@ -1357,6 +1711,7 @@
                       "content_size_bytes": 123,
                       "description": "Linting skill",
                       "freshness_days": 0,
+                      "lifecycle_status": "published",
                       "matched_fields": [
                         "name",
                         "tags"
@@ -1375,6 +1730,7 @@
                         "python",
                         "lint"
                       ],
+                      "trust_tier": "internal",
                       "usage_count": 0,
                       "version": "1.2.3"
                     }
@@ -1421,7 +1777,9 @@
                             {
                               "input": {
                                 "limit": 20,
-                                "tags": []
+                                "status": [],
+                                "tags": [],
+                                "trust_tier": []
                               },
                               "loc": [],
                               "msg": "Value error, At least one search selector must be provided.",
@@ -1442,6 +1800,11 @@
             "description": "The discovery request is invalid."
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Search skill discovery metadata",
         "tags": [
           "discovery"
@@ -1539,6 +1902,7 @@
                           },
                           "target_version": {
                             "description": "Base runtime skill",
+                            "lifecycle_status": "published",
                             "name": "Python Base",
                             "published_at": "2026-03-01T08:30:00Z",
                             "slug": "python.base",
@@ -1546,6 +1910,7 @@
                               "python",
                               "runtime"
                             ],
+                            "trust_tier": "verified",
                             "version": "1.0.0"
                           }
                         }
@@ -1598,6 +1963,11 @@
             "description": "The relationship query request is invalid."
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read direct immutable relationships",
         "tags": [
           "resolution"
@@ -1615,6 +1985,14 @@
                 "content": {
                   "raw_markdown": "# Python Lint\n\nLint Python files consistently.\n",
                   "rendered_summary": "Lint Python files consistently."
+                },
+                "governance": {
+                  "provenance": {
+                    "commit_sha": "aabbccddeeff00112233445566778899aabbccdd",
+                    "repo_url": "https://github.com/example/skills",
+                    "tree_path": "skills/python.lint"
+                  },
+                  "trust_tier": "internal"
                 },
                 "metadata": {
                   "description": "Linting skill",
@@ -1686,6 +2064,7 @@
                     "size_bytes": 123
                   },
                   "content_download_path": "/skills/python.lint/versions/1.2.3/content",
+                  "lifecycle_status": "published",
                   "metadata": {
                     "description": "Linting skill",
                     "headers": {
@@ -1705,6 +2084,11 @@
                       "lint"
                     ],
                     "token_estimate": 128
+                  },
+                  "provenance": {
+                    "commit_sha": "aabbccddeeff00112233445566778899aabbccdd",
+                    "repo_url": "https://github.com/example/skills",
+                    "tree_path": "skills/python.lint"
                   },
                   "published_at": "2026-03-10T08:30:00Z",
                   "relationships": {
@@ -1731,6 +2115,7 @@
                         },
                         "target_version": {
                           "description": "Base runtime skill",
+                          "lifecycle_status": "published",
                           "name": "Python Base",
                           "published_at": "2026-03-01T08:30:00Z",
                           "slug": "python.base",
@@ -1738,6 +2123,7 @@
                             "python",
                             "runtime"
                           ],
+                          "trust_tier": "verified",
                           "version": "1.0.0"
                         }
                       }
@@ -1753,6 +2139,7 @@
                     ]
                   },
                   "slug": "python.lint",
+                  "trust_tier": "internal",
                   "version": "1.2.3",
                   "version_checksum": {
                     "algorithm": "sha256",
@@ -1832,6 +2219,11 @@
             "description": "Normalized content or metadata persistence failed."
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Publish an immutable skill version",
         "tags": [
           "skills"
@@ -1863,7 +2255,9 @@
                 "example": {
                   "created_at": "2026-02-10T08:30:00Z",
                   "current_version": {
+                    "lifecycle_status": "published",
                     "published_at": "2026-03-10T08:30:00Z",
+                    "trust_tier": "internal",
                     "version": "1.2.3"
                   },
                   "slug": "python.lint",
@@ -1926,6 +2320,11 @@
             "description": "The request body, path parameters, or query parameters are invalid."
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Fetch one logical skill identity",
         "tags": [
           "skills"
@@ -1966,6 +2365,7 @@
                         "rendered_summary": "Lint Python files consistently.",
                         "size_bytes": 123
                       },
+                      "lifecycle_status": "published",
                       "metadata": {
                         "description": "Linting skill",
                         "name": "Python Lint",
@@ -1976,6 +2376,7 @@
                       },
                       "published_at": "2026-03-10T08:30:00Z",
                       "slug": "python.lint",
+                      "trust_tier": "internal",
                       "version": "1.2.3",
                       "version_checksum": {
                         "algorithm": "sha256",
@@ -2040,6 +2441,11 @@
             "description": "The request body, path parameters, or query parameters are invalid."
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "List immutable versions for one skill",
         "tags": [
           "skills"
@@ -2090,6 +2496,7 @@
                     "size_bytes": 123
                   },
                   "content_download_path": "/skills/python.lint/versions/1.2.3/content",
+                  "lifecycle_status": "published",
                   "metadata": {
                     "description": "Linting skill",
                     "headers": {
@@ -2109,6 +2516,11 @@
                       "lint"
                     ],
                     "token_estimate": 128
+                  },
+                  "provenance": {
+                    "commit_sha": "aabbccddeeff00112233445566778899aabbccdd",
+                    "repo_url": "https://github.com/example/skills",
+                    "tree_path": "skills/python.lint"
                   },
                   "published_at": "2026-03-10T08:30:00Z",
                   "relationships": {
@@ -2135,6 +2547,7 @@
                         },
                         "target_version": {
                           "description": "Base runtime skill",
+                          "lifecycle_status": "published",
                           "name": "Python Base",
                           "published_at": "2026-03-01T08:30:00Z",
                           "slug": "python.base",
@@ -2142,6 +2555,7 @@
                             "python",
                             "runtime"
                           ],
+                          "trust_tier": "verified",
                           "version": "1.0.0"
                         }
                       }
@@ -2157,6 +2571,7 @@
                     ]
                   },
                   "slug": "python.lint",
+                  "trust_tier": "internal",
                   "version": "1.2.3",
                   "version_checksum": {
                     "algorithm": "sha256",
@@ -2220,6 +2635,11 @@
             "description": "The request body or path parameters are invalid."
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Fetch exact immutable version metadata",
         "tags": [
           "fetch"
@@ -2316,9 +2736,134 @@
             "description": "The request body or path parameters are invalid."
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Fetch exact immutable markdown content",
         "tags": [
           "fetch"
+        ]
+      }
+    },
+    "/skills/{slug}/versions/{version}/status": {
+      "patch": {
+        "description": "Transition the lifecycle state for one immutable skill version.",
+        "operationId": "updateSkillVersionStatus",
+        "parameters": [
+          {
+            "description": "Stable public slug of the skill.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Stable public slug of the skill.",
+              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,127})$",
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact immutable semantic version to update.",
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "description": "Exact immutable semantic version to update.",
+              "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$",
+              "title": "Version",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillVersionStatusUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "is_current_default": true,
+                  "lifecycle_changed_at": "2026-03-11T09:15:00Z",
+                  "slug": "python.lint",
+                  "status": "deprecated",
+                  "trust_tier": "internal",
+                  "version": "1.2.3"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/SkillVersionStatusResponse"
+                }
+              }
+            },
+            "description": "Lifecycle status updated successfully."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "SKILL_VERSION_NOT_FOUND",
+                    "details": {
+                      "slug": "python.lint",
+                      "version": "9.9.9"
+                    },
+                    "message": "Skill version not found: python.lint@9.9.9"
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The requested immutable `slug@version` does not exist."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "error": {
+                    "code": "INVALID_REQUEST",
+                    "details": {
+                      "errors": [
+                        {
+                          "input": "latest",
+                          "loc": [
+                            "path",
+                            "version"
+                          ],
+                          "msg": "String should match pattern",
+                          "type": "string_pattern_mismatch"
+                        }
+                      ]
+                    },
+                    "message": "Request validation failed."
+                  }
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "The request body, path parameters, or query parameters are invalid."
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update immutable version lifecycle status",
+        "tags": [
+          "skills"
         ]
       }
     }

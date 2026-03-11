@@ -12,14 +12,14 @@ It reflects the direction implied by the current plans:
 - identity, versioning, body, query metadata, and graph edges are modeled separately
 
 ## Current Review
-The live schema today still mixes too many concerns:
+The live schema is now normalized around PostgreSQL-backed content, metadata,
+relationship selectors, dependencies, and governance state.
 
-- `skills` stores the logical skill identifier only
-- `skill_versions` stores both version identity and a large `manifest_json`
-- dependency/search tables are derived from `manifest_json`
-- artifact fetch still depends on filesystem-relative paths
-
-That model is enough for the current MVP, but it is not the clean long-term source model for normalized metadata search and PostgreSQL-native body storage.
+- `skills` stores only the logical identity row plus the current default version pointer
+- `skill_versions` binds immutable content and metadata to a version-scoped lifecycle/trust policy state
+- authored selectors live in `skill_relationship_selectors`
+- exact resolved version-to-version edges live in `skill_dependencies`
+- discovery uses `skill_search_documents` as a derived, governance-aware read model
 
 ## Design Principles
 - Keep `skills` as the stable identity row.
@@ -55,21 +55,19 @@ erDiagram
 ## Tables
 
 ### `skills`
-Stable identity and lifecycle state.
+Stable identity row.
 
 | Column | Type | Constraints | Purpose |
 | --- | --- | --- | --- |
 | `id` | `bigint` | PK | Internal identity key |
 | `slug` | `text` | `NOT NULL`, unique | Stable public skill identifier |
-| `current_version_id` | `bigint` | nullable FK -> `skill_versions.id` | Mutable pointer to the latest/default published version |
+| `current_version_id` | `bigint` | nullable FK -> `skill_versions.id` | Mutable pointer to the highest visible non-archived default version |
 | `created_at` | `timestamptz` | `NOT NULL` | Row creation time |
 | `updated_at` | `timestamptz` | `NOT NULL` | Last identity-state update |
-| `status` | `text` | `NOT NULL` | Lifecycle state such as `draft`, `published`, `deprecated`, `archived` |
 
 Recommended constraints and indexes:
 
 - unique index on `slug`
-- index on `(status, updated_at DESC)` if lifecycle filtering becomes common
 - repository-level invariant that `current_version_id`, when present, belongs to the same skill
 
 ### `skill_versions`
@@ -78,26 +76,32 @@ Immutable version rows binding identity, content, and metadata together.
 | Column | Type | Constraints | Purpose |
 | --- | --- | --- | --- |
 | `id` | `bigint` | PK | Internal immutable version key |
-| `skill_id` | `bigint` | `NOT NULL`, FK -> `skills.id` | Parent skill identity |
+| `skill_fk` | `bigint` | `NOT NULL`, FK -> `skills.id` | Parent skill identity |
 | `version` | `text` | `NOT NULL` | Semantic version string |
-| `content_id` | `bigint` | `NOT NULL`, FK -> `skill_contents.id` | Immutable body row |
-| `metadata_id` | `bigint` | `NOT NULL`, FK -> `skill_metadata.id` | Immutable metadata row |
-| `checksum` | `text` | `NOT NULL` | Version-level digest for integrity and caching |
+| `content_fk` | `bigint` | `NOT NULL`, FK -> `skill_contents.id` | Immutable body row |
+| `metadata_fk` | `bigint` | `NOT NULL`, FK -> `skill_metadata.id` | Immutable metadata row |
+| `checksum_digest` | `text` | `NOT NULL` | Version-level digest for integrity and caching |
+| `lifecycle_status` | `text` | `NOT NULL` | `published`, `deprecated`, or `archived` |
+| `lifecycle_changed_at` | `timestamptz` | `NOT NULL` | Most recent lifecycle transition time |
+| `trust_tier` | `text` | `NOT NULL` | `untrusted`, `internal`, or `verified` |
+| `provenance_repo_url` | `text` | nullable | Minimal source repository provenance |
+| `provenance_commit_sha` | `text` | nullable | Commit associated with the published version |
+| `provenance_tree_path` | `text` | nullable | Optional repository subpath for the skill |
 | `created_at` | `timestamptz` | `NOT NULL` | Insert time |
-| `published_at` | `timestamptz` | nullable | Publish timestamp |
-| `is_published` | `boolean` | `NOT NULL` | Publication state |
+| `published_at` | `timestamptz` | `NOT NULL` | Publish timestamp |
 
 Recommended constraints and indexes:
 
-- unique index on `(skill_id, version)`
-- index on `(is_published, published_at DESC)`
-- indexes on `content_id` and `metadata_id`
-- optional index on `checksum` if used as a fetch/cache key
+- unique index on `(skill_fk, version)`
+- index on `(skill_fk, published_at DESC, id DESC)`
+- indexes on `content_fk` and `metadata_fk`
+- check constraints on `lifecycle_status` and `trust_tier`
 
 Immutability rule:
 
-- once `is_published = true`, treat the row as write-once
+- lifecycle and trust are version-scoped governance state
 - any body or metadata change creates a new `skill_versions` row
+- `archived` rows are never eligible for `skills.current_version_id`
 
 ### `skill_contents`
 Authoritative markdown body storage.
@@ -168,7 +172,8 @@ Important note:
 ### `skill_search_documents`
 Derived read model for fast advisory search.
 
-This table is optional but recommended when discovery load grows. It should stay derived from `skills`, `skill_versions`, and `skill_metadata`.
+This table is derived from `skills`, `skill_versions`, `skill_metadata`, and
+`skill_contents`.
 
 Suggested fields:
 
@@ -176,14 +181,18 @@ Suggested fields:
 | --- | --- | --- |
 | `skill_version_id` | `bigint` | PK and FK to `skill_versions.id` |
 | `slug` | `text` | Normalized identifier for direct matching |
+| `normalized_slug` | `text` | Lowercased identifier for exact matching |
 | `version` | `text` | Candidate version |
 | `name` | `text` | Display name |
+| `normalized_name` | `text` | Lowercased display name |
 | `description` | `text` | Searchable summary |
 | `tags` | `text[]` | Search filters |
+| `normalized_tags` | `text[]` | Lowercased tags for containment filters |
+| `lifecycle_status` | `text` | Discovery visibility filter |
+| `trust_tier` | `text` | Trust filter |
 | `published_at` | `timestamptz` | Freshness ranking input |
-| `token_estimate` | `integer` | Ranking/filtering input |
-| `maturity_score` | `numeric` | Ranking input |
-| `security_score` | `numeric` | Ranking input |
+| `content_size_bytes` | `bigint` | Ranking/filtering input |
+| `usage_count` | `bigint` | Ranking tie-break input |
 | `search_vector` | `tsvector` | Full-text index target |
 
 Recommended indexes:
@@ -192,6 +201,8 @@ Recommended indexes:
 - GIN on `tags`
 - B-tree on `slug`
 - B-tree on `published_at`
+- B-tree on `lifecycle_status`
+- B-tree on `trust_tier`
 
 Rule:
 
@@ -214,24 +225,17 @@ Exact fetch path:
 - load `skill_contents.raw_markdown`
 - verify checksum from `skill_versions.checksum` and/or `skill_contents.checksum`
 
-## Migration Direction from the Current Schema
-Current tables:
+## Migration Direction
+Milestone 06 completes the move to the normalized source model:
 
-- `skills`
-- `skill_versions`
-- `skill_version_checksums`
-- `skill_relationship_edges`
-- `skill_search_documents`
-
-Suggested migration sequence:
-
-1. Add `skill_contents` and `skill_metadata`.
-2. Backfill rows from `skill_versions.manifest_json`.
-3. Add normalized foreign keys from `skill_versions` to content and metadata.
-4. Replace filesystem `artifact_rel_path` reads with PostgreSQL content reads.
-5. Replace or refactor `skill_relationship_edges` into `skill_dependencies`.
-6. Rebuild `skill_search_documents` from normalized sources.
-7. Remove obsolete mixed-source columns once the API layer is migrated.
+1. `skill_contents` and `skill_metadata` are canonical.
+2. `skill_relationship_selectors` preserves authored selectors.
+3. `skill_dependencies` stores exact resolved version edges.
+4. `skill_versions` carries version-scoped lifecycle, trust, and provenance.
+5. `skill_search_documents` stores lifecycle/trust for governance-aware discovery.
+6. Legacy compatibility mirrors such as `skill_versions.manifest_json`,
+   `artifact_rel_path`, `artifact_size_bytes`, `is_published`,
+   `skill_version_checksums`, and `skill_relationship_edges` are removed at head.
 
 ## Non-Goals
 - storing markdown in `jsonb`

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from app.core.governance import CallerIdentity, GovernancePolicy, build_default_policy_profile
 from app.core.ports import (
     ExactSkillCoordinate,
     StoredRelationshipSelector,
@@ -58,6 +59,8 @@ def test_get_direct_relationships_converts_exact_target_versions_to_domain_summa
     source = StoredSkillRelationshipSource(
         slug="python.source",
         version="1.0.0",
+        lifecycle_status="published",
+        trust_tier="internal",
         relationships=(
             StoredRelationshipSelector(
                 edge_type="depends_on",
@@ -80,14 +83,18 @@ def test_get_direct_relationships_converts_exact_target_versions_to_domain_summa
         name="Python Dependency",
         description=None,
         tags=("python",),
+        lifecycle_status="published",
+        trust_tier="verified",
         published_at=published_at,
     )
     service = SkillRelationshipService(
         relationship_reader=FakeRelationshipReader(source),
         version_reader=FakeVersionReader(target),
+        governance_policy=GovernancePolicy(profile=build_default_policy_profile()),
     )
 
     result = service.get_direct_relationships(
+        caller=CallerIdentity(token="reader", scopes=frozenset({"read"})),
         coordinates=(ExactSkillCoordinate(slug="python.source", version="1.0.0"),),
         edge_types=("depends_on",),
     )

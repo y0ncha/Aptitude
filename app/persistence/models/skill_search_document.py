@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Text, func, text
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, Text, func, text
 from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,10 +16,20 @@ class SkillSearchDocument(Base):
 
     __tablename__ = "skill_search_documents"
     __table_args__ = (
+        CheckConstraint(
+            "lifecycle_status IN ('published', 'deprecated', 'archived')",
+            name="ck_skill_search_documents_lifecycle_status",
+        ),
+        CheckConstraint(
+            "trust_tier IN ('untrusted', 'internal', 'verified')",
+            name="ck_skill_search_documents_trust_tier",
+        ),
         Index("ix_skill_search_documents_normalized_slug", "normalized_slug"),
         Index("ix_skill_search_documents_normalized_name", "normalized_name"),
         Index("ix_skill_search_documents_published_at", "published_at"),
         Index("ix_skill_search_documents_content_size_bytes", "content_size_bytes"),
+        Index("ix_skill_search_documents_lifecycle_status", "lifecycle_status"),
+        Index("ix_skill_search_documents_trust_tier", "trust_tier"),
         Index(
             "ix_skill_search_documents_normalized_tags_gin",
             "normalized_tags",
@@ -45,6 +55,16 @@ class SkillSearchDocument(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     normalized_tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    lifecycle_status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("'published'"),
+    )
+    trust_tier: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("'untrusted'"),
+    )
     search_vector: Mapped[str] = mapped_column(
         TSVECTOR,
         nullable=False,

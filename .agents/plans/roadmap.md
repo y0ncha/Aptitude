@@ -31,7 +31,7 @@ Deliver a production-ready, PyPI-like immutable registry service (`aptitude-serv
 7. `07-evaluation-repo-state-reproducibility.md`
 8. `08-operability-and-release-readiness.md`
 9. `09-postgres-content-addressed-artifact-cache.md`
-10. `10-hybrid-artifact-storage-and-git-provenance.md`
+10. `10-postgres-only-artifact-storage-and-provenance.md`
 11. `11-discovery-resolution-fetch-service-split.md`
 
 ## PRD Phase Mapping
@@ -43,6 +43,7 @@ Deliver a production-ready, PyPI-like immutable registry service (`aptitude-serv
 - Resolver-specific initiatives (prompt interpretation, deterministic solving, reranking, plugin chains, and lock replay) are tracked in resolver planning and are out of scope for this roadmap.
 
 ## Roadmap Rules
-- Plans are append-only.
+- Roadmap numbering is append-only.
+- Plan filenames and titles may be corrected before implementation when the existing milestone framing is architecturally wrong.
 - Completed plans are never renamed or renumbered.
 - New scope changes create a new numbered plan file.

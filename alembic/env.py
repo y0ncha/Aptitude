@@ -21,10 +21,12 @@ from app.core.settings import get_settings, reset_settings_cache
 from app.persistence.models import (
     audit_event,  # noqa: F401
     skill,  # noqa: F401
-    skill_relationship_edge,  # noqa: F401
+    skill_content,  # noqa: F401
+    skill_dependency,  # noqa: F401
+    skill_metadata,  # noqa: F401
+    skill_relationship_selector,  # noqa: F401
     skill_search_document,  # noqa: F401
     skill_version,  # noqa: F401
-    skill_version_checksum,  # noqa: F401
 )
 from app.persistence.models.base import Base
 

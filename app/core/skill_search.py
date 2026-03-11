@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from app.core.governance import CallerIdentity, GovernancePolicy, LifecycleStatus, TrustTier
 from app.core.ports import AuditPort, SearchCandidatesRequest, SkillSearchPort
 from app.intelligence.search_ranking import (
     build_search_audit_payload,
@@ -23,6 +24,8 @@ class SkillSearchQuery:
     fresh_within_days: int | None
     max_footprint_bytes: int | None
     limit: int
+    status: tuple[LifecycleStatus, ...] = ()
+    trust_tier: tuple[TrustTier, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +37,8 @@ class SkillSearchResult:
     name: str
     description: str | None
     tags: tuple[str, ...]
+    lifecycle_status: LifecycleStatus
+    trust_tier: TrustTier
     published_at: datetime
     freshness_days: int
     content_size_bytes: int
@@ -46,11 +51,23 @@ class SkillSearchResult:
 class SkillSearchService:
     """Read-only search service for indexed candidate retrieval."""
 
-    def __init__(self, *, search_port: SkillSearchPort, audit_recorder: AuditPort) -> None:
+    def __init__(
+        self,
+        *,
+        search_port: SkillSearchPort,
+        audit_recorder: AuditPort,
+        governance_policy: GovernancePolicy,
+    ) -> None:
         self._search_port = search_port
         self._audit_recorder = audit_recorder
+        self._governance_policy = governance_policy
 
-    def search(self, *, query: SkillSearchQuery) -> tuple[SkillSearchResult, ...]:
+    def search(
+        self,
+        *,
+        caller: CallerIdentity,
+        query: SkillSearchQuery,
+    ) -> tuple[SkillSearchResult, ...]:
         """Return compact, deterministically explained search candidates."""
         normalized_request = normalize_search_request(
             q=query.q,
@@ -60,12 +77,21 @@ class SkillSearchService:
             max_footprint_bytes=query.max_footprint_bytes,
             limit=query.limit,
         )
+        lifecycle_statuses = self._governance_policy.resolve_discovery_statuses(
+            caller=caller,
+            requested_statuses=query.status,
+        )
+        trust_tiers = self._governance_policy.resolve_discovery_trust_tiers(
+            requested_trust_tiers=query.trust_tier,
+        )
         stored_results = self._search_port.search_candidates(
             request=SearchCandidatesRequest(
                 query_text=normalized_request.query_text,
                 required_tags=normalized_request.effective_tags,
                 fresh_within_days=normalized_request.fresh_within_days,
                 max_content_size_bytes=normalized_request.max_footprint_bytes,
+                lifecycle_statuses=lifecycle_statuses,
+                trust_tiers=trust_tiers,
                 limit=normalized_request.limit,
             )
         )
@@ -78,6 +104,8 @@ class SkillSearchService:
                 name=item.name,
                 description=item.description,
                 tags=item.tags,
+                lifecycle_status=item.lifecycle_status,
+                trust_tier=item.trust_tier,
                 published_at=item.published_at,
                 freshness_days=max((current_time - item.published_at).days, 0),
                 content_size_bytes=item.content_size_bytes,

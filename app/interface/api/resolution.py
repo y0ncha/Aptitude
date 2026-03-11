@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, status
 
-from app.core.dependencies import SkillRelationshipServiceDep
+from app.core.dependencies import ReadCallerDep, SkillRelationshipServiceDep
 from app.core.ports import ExactSkillCoordinate
 from app.core.skill_relationships import SkillRelationshipBatchItem
 from app.interface.api.skill_api_support import to_related_version_response
@@ -57,9 +57,11 @@ RELATIONSHIP_RESPONSES: OpenAPIResponses = {
 def batch_get_relationships(
     request: SkillRelationshipBatchRequest,
     relationship_service: SkillRelationshipServiceDep,
+    caller: ReadCallerDep,
 ) -> SkillRelationshipBatchResponse:
     """Return direct authored relationships in request order."""
     results = relationship_service.get_direct_relationships(
+        caller=caller,
         coordinates=tuple(
             ExactSkillCoordinate(slug=item.slug, version=item.version)
             for item in request.coordinates

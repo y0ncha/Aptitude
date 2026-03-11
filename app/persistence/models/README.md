@@ -12,9 +12,11 @@ migrations.
 - `base.py`: declarative base class.
 - `skill.py`: logical skill root table (`skills`).
 - `skill_version.py`: immutable version metadata (`skill_versions`).
-- `skill_version_checksum.py`: checksum metadata (`skill_version_checksums`).
-- `skill_relationship_edge.py`: typed relationship edges (`skill_relationship_edges`)
-  with authored target version selectors for dependency/read-model projections.
+- `skill_content.py`: canonical markdown storage (`skill_contents`).
+- `skill_metadata.py`: normalized metadata storage (`skill_metadata`).
+- `skill_relationship_selector.py`: authored relationship selectors
+  (`skill_relationship_selectors`).
+- `skill_dependency.py`: exact relationship projection (`skill_dependencies`).
 - `skill_search_document.py`: denormalized advisory search documents (`skill_search_documents`)
   for compact candidate retrieval.
 - `audit_event.py`: audit event table (`audit_events`).

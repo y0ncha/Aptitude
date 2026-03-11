@@ -8,17 +8,25 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.governance import CallerIdentity
 from app.core.readiness import ReadinessService
 from app.core.settings import Settings, get_settings
 from app.core.skill_discovery import SkillDiscoveryService
 from app.core.skill_fetch import SkillFetchService
 from app.core.skill_registry import SkillRegistryService
 from app.core.skill_relationships import SkillRelationshipService
+from app.interface.api.errors import ApiError
 
 # Shared settings dependency used by route handlers and adapters.
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+_bearer_scheme = HTTPBearer(auto_error=False)
+BearerCredentialsDep = Annotated[
+    HTTPAuthorizationCredentials | None,
+    Depends(_bearer_scheme),
+]
 
 
 def get_readiness_service(request: Request) -> ReadinessService:
@@ -87,3 +95,85 @@ def get_skill_relationship_service(request: Request) -> SkillRelationshipService
 SkillRelationshipServiceDep = Annotated[
     SkillRelationshipService, Depends(get_skill_relationship_service)
 ]
+
+
+def _caller_from_request(
+    *,
+    credentials: HTTPAuthorizationCredentials | None,
+    settings: Settings,
+) -> CallerIdentity:
+    if credentials is None:
+        raise ApiError(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="AUTHENTICATION_REQUIRED",
+            message="Bearer token is required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if credentials.scheme.lower() != "bearer" or not credentials.credentials:
+        raise ApiError(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="INVALID_AUTH_TOKEN",
+            message="Authorization header must use the Bearer scheme.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+    scopes = settings.auth_tokens.get(token)
+    if scopes is None:
+        raise ApiError(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            code="INVALID_AUTH_TOKEN",
+            message="Bearer token is not recognized.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return CallerIdentity(token=token, scopes=frozenset(scopes))
+
+
+def get_read_caller(credentials: BearerCredentialsDep, settings: SettingsDep) -> CallerIdentity:
+    """Authenticate a caller with read scope."""
+    caller = _caller_from_request(credentials=credentials, settings=settings)
+    if not caller.has_scope("read"):
+        raise ApiError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="INSUFFICIENT_SCOPE",
+            message="Caller lacks the required scope.",
+            details={"required_scope": "read"},
+        )
+    return caller
+
+
+ReadCallerDep = Annotated[CallerIdentity, Depends(get_read_caller)]
+
+
+def get_publish_caller(credentials: BearerCredentialsDep, settings: SettingsDep) -> CallerIdentity:
+    """Authenticate a caller with publish scope."""
+    caller = _caller_from_request(credentials=credentials, settings=settings)
+    if not caller.has_scope("publish"):
+        raise ApiError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="INSUFFICIENT_SCOPE",
+            message="Caller lacks the required scope.",
+            details={"required_scope": "publish"},
+        )
+    return caller
+
+
+PublishCallerDep = Annotated[CallerIdentity, Depends(get_publish_caller)]
+
+
+def get_admin_caller(credentials: BearerCredentialsDep, settings: SettingsDep) -> CallerIdentity:
+    """Authenticate a caller with admin scope."""
+    caller = _caller_from_request(credentials=credentials, settings=settings)
+    if not caller.has_scope("admin"):
+        raise ApiError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="INSUFFICIENT_SCOPE",
+            message="Caller lacks the required scope.",
+            details={"required_scope": "admin"},
+        )
+    return caller
+
+
+AdminCallerDep = Annotated[CallerIdentity, Depends(get_admin_caller)]

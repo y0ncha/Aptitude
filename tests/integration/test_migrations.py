@@ -1,8 +1,9 @@
-"""Integration coverage for Alembic migration lifecycle."""
+"""Integration coverage for the Alembic migration lifecycle."""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from alembic.config import Config
@@ -31,6 +32,33 @@ def test_migrations_upgrade_and_downgrade(require_integration_database: str) -> 
         assert "skill_relationship_selectors" in inspector.get_table_names()
         assert "skill_dependencies" in inspector.get_table_names()
         assert "skill_search_documents" in inspector.get_table_names()
+        assert "skill_relationship_edges" not in inspector.get_table_names()
+        assert "skill_version_checksums" not in inspector.get_table_names()
+
+        skill_columns = {column["name"] for column in inspector.get_columns("skills")}
+        version_columns = {column["name"] for column in inspector.get_columns("skill_versions")}
+        search_columns = {
+            column["name"] for column in inspector.get_columns("skill_search_documents")
+        }
+
+        assert "skill_id" not in skill_columns
+        assert "status" not in skill_columns
+        assert {"slug", "current_version_id"} <= skill_columns
+
+        assert "manifest_json" not in version_columns
+        assert "artifact_rel_path" not in version_columns
+        assert "artifact_size_bytes" not in version_columns
+        assert "is_published" not in version_columns
+        assert {
+            "lifecycle_status",
+            "lifecycle_changed_at",
+            "trust_tier",
+            "provenance_repo_url",
+            "provenance_commit_sha",
+            "provenance_tree_path",
+        } <= version_columns
+
+        assert {"lifecycle_status", "trust_tier"} <= search_columns
     finally:
         upgraded_engine.dispose()
 
@@ -52,10 +80,10 @@ def test_migrations_upgrade_and_downgrade(require_integration_database: str) -> 
 
 
 @pytest.mark.integration
-def test_0005_backfills_normalized_tables_from_legacy_rows(
+def test_0004_to_head_backfills_governance_defaults_and_removes_legacy_columns(
     require_integration_database: str,
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir(parents=True, exist_ok=True)
@@ -159,18 +187,27 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
 
     upgraded_engine = create_engine(require_integration_database)
     try:
+        inspector = inspect(upgraded_engine)
         with upgraded_engine.connect() as connection:
             content_row = (
                 connection.execute(
                     text(
                         """
-                    SELECT sc.raw_markdown, sm.name, s.slug
-                    FROM skill_versions AS sv
-                    JOIN skills AS s ON s.id = sv.skill_fk
-                    JOIN skill_contents AS sc ON sc.id = sv.content_fk
-                    JOIN skill_metadata AS sm ON sm.id = sv.metadata_fk
-                    WHERE s.slug = 'migration.source'
-                    """
+                        SELECT
+                            sc.raw_markdown,
+                            sm.name,
+                            s.slug,
+                            sv.lifecycle_status,
+                            sv.trust_tier,
+                            sv.provenance_repo_url,
+                            sv.lifecycle_changed_at,
+                            s.current_version_id
+                        FROM skill_versions AS sv
+                        JOIN skills AS s ON s.id = sv.skill_fk
+                        JOIN skill_contents AS sc ON sc.id = sv.content_fk
+                        JOIN skill_metadata AS sm ON sm.id = sv.metadata_fk
+                        WHERE s.slug = 'migration.source'
+                        """
                     )
                 )
                 .mappings()
@@ -179,6 +216,11 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
             assert content_row["raw_markdown"] == "# Migration Source\n"
             assert content_row["name"] == "Migration Source"
             assert content_row["slug"] == "migration.source"
+            assert content_row["lifecycle_status"] == "published"
+            assert content_row["trust_tier"] == "untrusted"
+            assert content_row["provenance_repo_url"] is None
+            assert content_row["lifecycle_changed_at"] is not None
+            assert content_row["current_version_id"] is not None
 
             dependency_row = connection.execute(
                 text(
@@ -197,10 +239,15 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
                 connection.execute(
                     text(
                         """
-                    SELECT slug, normalized_slug, content_size_bytes
-                    FROM skill_search_documents
-                    WHERE slug = 'migration.source'
-                    """
+                        SELECT
+                            slug,
+                            normalized_slug,
+                            content_size_bytes,
+                            lifecycle_status,
+                            trust_tier
+                        FROM skill_search_documents
+                        WHERE slug = 'migration.source'
+                        """
                     )
                 )
                 .mappings()
@@ -208,5 +255,18 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
             )
             assert search_row["normalized_slug"] == "migration.source"
             assert search_row["content_size_bytes"] == len(b"# Migration Source\n")
+            assert search_row["lifecycle_status"] == "published"
+            assert search_row["trust_tier"] == "untrusted"
+
+        assert "skill_relationship_edges" not in inspector.get_table_names()
+        assert "skill_version_checksums" not in inspector.get_table_names()
+        skill_columns = {column["name"] for column in inspector.get_columns("skills")}
+        version_columns = {column["name"] for column in inspector.get_columns("skill_versions")}
+        assert "skill_id" not in skill_columns
+        assert "status" not in skill_columns
+        assert "manifest_json" not in version_columns
+        assert "artifact_rel_path" not in version_columns
+        assert "artifact_size_bytes" not in version_columns
+        assert "is_published" not in version_columns
     finally:
         upgraded_engine.dispose()

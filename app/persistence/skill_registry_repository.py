@@ -10,9 +10,11 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload, selectinload, sessionmaker
 
+from app.core.governance import LifecycleStatus, ProvenanceMetadata, TrustTier
 from app.core.ports import (
     CreateSkillVersionRecord,
     ExactSkillCoordinate,
+    GovernanceRecordInput,
     MetadataRecordInput,
     RelationshipEdgeType,
     RelationshipSelectorRecordInput,
@@ -28,6 +30,7 @@ from app.core.ports import (
     StoredSkillSearchCandidate,
     StoredSkillVersion,
     StoredSkillVersionContent,
+    StoredSkillVersionStatus,
     StoredSkillVersionSummary,
 )
 from app.core.skill_registry import DuplicateSkillVersionError
@@ -56,6 +59,8 @@ _SEARCH_CANDIDATES_SQL = text(
             doc.name,
             doc.description,
             doc.tags,
+            doc.lifecycle_status,
+            doc.trust_tier,
             doc.published_at,
             doc.content_size_bytes,
             doc.usage_count,
@@ -101,6 +106,8 @@ _SEARCH_CANDIDATES_SQL = text(
             :max_content_size_bytes IS NULL
             OR doc.content_size_bytes <= :max_content_size_bytes
           )
+          AND doc.lifecycle_status = ANY(:lifecycle_statuses)
+          AND doc.trust_tier = ANY(:trust_tiers)
     ),
     ranked AS (
         SELECT
@@ -127,6 +134,8 @@ _SEARCH_CANDIDATES_SQL = text(
         name,
         description,
         tags,
+        lifecycle_status,
+        trust_tier,
         published_at,
         content_size_bytes,
         usage_count,
@@ -154,6 +163,8 @@ _SEARCH_CANDIDATES_SQL = text(
     bindparam("required_tag_count", type_=Integer()),
     bindparam("published_after", type_=DateTime(timezone=True)),
     bindparam("max_content_size_bytes", type_=BigInteger()),
+    bindparam("lifecycle_statuses", type_=ARRAY(Text())),
+    bindparam("trust_tiers", type_=ARRAY(Text())),
     bindparam("limit", type_=Integer()),
 )
 
@@ -204,13 +215,31 @@ class SQLAlchemySkillRegistryRepository(
                     content_fk=content.id,
                     metadata_fk=metadata.id,
                     checksum_digest=record.version_checksum_digest,
-                    manifest_json=record.legacy_manifest_json,
-                    artifact_rel_path=_legacy_content_path(record.slug, record.version),
-                    artifact_size_bytes=record.content.size_bytes,
+                    lifecycle_status="published",
+                    lifecycle_changed_at=datetime.now(UTC),
+                    trust_tier=record.governance.trust_tier,
+                    provenance_repo_url=(
+                        None
+                        if record.governance.provenance is None
+                        else record.governance.provenance.repo_url
+                    ),
+                    provenance_commit_sha=(
+                        None
+                        if record.governance.provenance is None
+                        else record.governance.provenance.commit_sha
+                    ),
+                    provenance_tree_path=(
+                        None
+                        if record.governance.provenance is None
+                        else record.governance.provenance.tree_path
+                    ),
                 )
                 session.add(skill_version)
                 session.flush()
-                session.refresh(skill_version, attribute_names=["published_at", "created_at"])
+                session.refresh(
+                    skill_version,
+                    attribute_names=["published_at", "created_at", "lifecycle_changed_at"],
+                )
 
                 selector_rows = [
                     SkillRelationshipSelector(
@@ -239,13 +268,13 @@ class SQLAlchemySkillRegistryRepository(
                         slug=record.slug,
                         version=record.version,
                         metadata=record.metadata,
+                        governance=record.governance,
                         published_at=skill_version.published_at,
                         content_size_bytes=record.content.size_bytes,
                     )
                 )
 
                 skill.current_version_id = skill_version.id
-                skill.status = "published"
                 session.commit()
 
                 reloaded = self._get_version_entity(
@@ -276,7 +305,13 @@ class SQLAlchemySkillRegistryRepository(
         with self._session_factory() as session:
             current_version = SkillVersion
             statement = (
-                select(Skill, current_version.published_at)
+                select(
+                    Skill,
+                    current_version.version,
+                    current_version.published_at,
+                    current_version.lifecycle_status,
+                    current_version.trust_tier,
+                )
                 .outerjoin(current_version, current_version.id == Skill.current_version_id)
                 .where(Skill.slug == slug)
             )
@@ -284,17 +319,14 @@ class SQLAlchemySkillRegistryRepository(
             if row is None:
                 return None
 
-            skill, published_at = row
-            current_version_value = None
-            if skill.current_version_id is not None:
-                current_version_value = session.execute(
-                    select(SkillVersion.version).where(SkillVersion.id == skill.current_version_id)
-                ).scalar_one_or_none()
+            skill, version, published_at, lifecycle_status, trust_tier = row
             return StoredSkillIdentity(
                 slug=skill.slug,
-                status=skill.status,
-                current_version=current_version_value,
+                status=cast(LifecycleStatus, lifecycle_status or "published"),
+                current_version=cast(str | None, version),
                 current_version_published_at=published_at,
+                current_version_status=cast(LifecycleStatus | None, lifecycle_status),
+                current_version_trust_tier=cast(TrustTier | None, trust_tier),
                 created_at=skill.created_at,
                 updated_at=skill.updated_at,
             )
@@ -317,6 +349,8 @@ class SQLAlchemySkillRegistryRepository(
                 raw_markdown=entity.content.raw_markdown,
                 checksum_digest=entity.content.checksum_digest,
                 size_bytes=entity.content.storage_size_bytes,
+                lifecycle_status=cast(LifecycleStatus, entity.lifecycle_status),
+                trust_tier=cast(TrustTier, entity.trust_tier),
                 published_at=entity.published_at,
             )
 
@@ -383,6 +417,8 @@ class SQLAlchemySkillRegistryRepository(
                 StoredSkillRelationshipSource(
                     slug=item.skill.slug,
                     version=item.version,
+                    lifecycle_status=cast(LifecycleStatus, item.lifecycle_status),
+                    trust_tier=cast(TrustTier, item.trust_tier),
                     relationships=tuple(
                         _to_stored_selector(selector)
                         for selector in _sort_relationship_selectors(item.relationship_selectors)
@@ -409,6 +445,8 @@ class SQLAlchemySkillRegistryRepository(
                     "required_tag_count": len(request.required_tags),
                     "published_after": published_after,
                     "max_content_size_bytes": request.max_content_size_bytes,
+                    "lifecycle_statuses": list(request.lifecycle_statuses),
+                    "trust_tiers": list(request.trust_tiers),
                     "limit": request.limit,
                 },
             ).mappings()
@@ -420,6 +458,8 @@ class SQLAlchemySkillRegistryRepository(
                     name=str(row["name"]),
                     description=str(row["description"]) if row["description"] is not None else None,
                     tags=tuple(_ensure_string_list(row["tags"])),
+                    lifecycle_status=cast(LifecycleStatus, str(row["lifecycle_status"])),
+                    trust_tier=cast(TrustTier, str(row["trust_tier"])),
                     published_at=_ensure_datetime(row["published_at"]),
                     content_size_bytes=int(row["content_size_bytes"]),
                     usage_count=int(row["usage_count"]),
@@ -431,13 +471,59 @@ class SQLAlchemySkillRegistryRepository(
                 for row in rows
             )
 
+    def update_version_status(
+        self,
+        *,
+        slug: str,
+        version: str,
+        lifecycle_status: LifecycleStatus,
+    ) -> StoredSkillVersionStatus | None:
+        with self._session_factory() as session:
+            try:
+                entity = self._get_version_entity(session=session, slug=slug, version=version)
+                if entity is None:
+                    return None
+                entity.lifecycle_status = lifecycle_status
+                entity.lifecycle_changed_at = datetime.now(UTC)
+                session.add(entity)
+                session.flush()
+
+                search_document = session.get(SkillSearchDocument, entity.id)
+                if search_document is not None:
+                    search_document.lifecycle_status = lifecycle_status
+                    session.add(search_document)
+
+                skill = session.get(Skill, entity.skill_fk)
+                if skill is None:
+                    raise SkillRegistryPersistenceError("Skill identity is missing.")
+                skill.current_version_id = self._select_current_version_id(
+                    session=session,
+                    skill_id=entity.skill_fk,
+                )
+                session.flush()
+                session.commit()
+
+                return StoredSkillVersionStatus(
+                    slug=slug,
+                    version=version,
+                    lifecycle_status=cast(LifecycleStatus, entity.lifecycle_status),
+                    trust_tier=cast(TrustTier, entity.trust_tier),
+                    lifecycle_changed_at=entity.lifecycle_changed_at,
+                    is_current_default=skill.current_version_id == entity.id,
+                )
+            except SQLAlchemyError as exc:
+                session.rollback()
+                raise SkillRegistryPersistenceError(
+                    "Failed to update immutable skill version status."
+                ) from exc
+
     @staticmethod
     def _get_or_create_skill(*, session: Session, slug: str) -> Skill:
         existing = session.execute(select(Skill).where(Skill.slug == slug)).scalar_one_or_none()
         if existing is not None:
             return existing
 
-        created = Skill(skill_id=slug, slug=slug)
+        created = Skill(slug=slug)
         session.add(created)
         session.flush()
         return created
@@ -496,6 +582,25 @@ class SQLAlchemySkillRegistryRepository(
             )
 
     @staticmethod
+    def _select_current_version_id(*, session: Session, skill_id: int) -> int | None:
+        return session.execute(
+            select(SkillVersion.id)
+            .where(
+                SkillVersion.skill_fk == skill_id,
+                SkillVersion.lifecycle_status.in_(("published", "deprecated")),
+            )
+            .order_by(
+                text(
+                    "CASE skill_versions.lifecycle_status "
+                    "WHEN 'published' THEN 0 WHEN 'deprecated' THEN 1 ELSE 2 END"
+                ),
+                SkillVersion.published_at.desc(),
+                SkillVersion.id.desc(),
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+
+    @staticmethod
     def _get_version_entity(
         *,
         session: Session,
@@ -545,6 +650,10 @@ def _to_stored_skill_version(entity: SkillVersion) -> StoredSkillVersion:
         token_estimate=entity.metadata_row.token_estimate,
         maturity_score=entity.metadata_row.maturity_score,
         security_score=entity.metadata_row.security_score,
+        lifecycle_status=cast(LifecycleStatus, entity.lifecycle_status),
+        trust_tier=cast(TrustTier, entity.trust_tier),
+        provenance=_to_provenance(entity),
+        lifecycle_changed_at=entity.lifecycle_changed_at,
         published_at=entity.published_at,
         relationships=tuple(
             _to_stored_selector(selector)
@@ -564,6 +673,8 @@ def _to_stored_skill_version_summary(entity: SkillVersion) -> StoredSkillVersion
         name=entity.metadata_row.name,
         description=entity.metadata_row.description,
         tags=tuple(entity.metadata_row.tags),
+        lifecycle_status=cast(LifecycleStatus, entity.lifecycle_status),
+        trust_tier=cast(TrustTier, entity.trust_tier),
         published_at=entity.published_at,
     )
 
@@ -586,6 +697,7 @@ def _build_search_document(
     slug: str,
     version: str,
     metadata: MetadataRecordInput,
+    governance: GovernanceRecordInput,
     published_at: datetime | None,
     content_size_bytes: int,
 ) -> SkillSearchDocument:
@@ -599,14 +711,12 @@ def _build_search_document(
         description=metadata.description,
         tags=list(metadata.tags),
         normalized_tags=sorted({_normalize_text(tag) for tag in metadata.tags if tag.strip()}),
+        lifecycle_status="published",
+        trust_tier=governance.trust_tier,
         published_at=_ensure_datetime(published_at),
         content_size_bytes=content_size_bytes,
         usage_count=0,
     )
-
-
-def _legacy_content_path(slug: str, version: str) -> str:
-    return f"db://skills/{slug}/{version}/content.md"
 
 
 def _is_duplicate_skill_version_error(error: IntegrityError) -> bool:
@@ -634,3 +744,13 @@ def _ensure_datetime(value: datetime | None) -> datetime:
 
 def _normalize_text(value: str) -> str:
     return " ".join(value.split()).strip().lower()
+
+
+def _to_provenance(entity: SkillVersion) -> ProvenanceMetadata | None:
+    if entity.provenance_repo_url is None or entity.provenance_commit_sha is None:
+        return None
+    return ProvenanceMetadata(
+        repo_url=entity.provenance_repo_url,
+        commit_sha=entity.provenance_commit_sha,
+        tree_path=entity.provenance_tree_path,
+    )

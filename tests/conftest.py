@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Generator
 
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 DEFAULT_TEST_DATABASE_URL = "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude"
+DEFAULT_AUTH_TOKENS = {
+    "reader-token": ["read"],
+    "publisher-token": ["read", "publish"],
+    "admin-token": ["read", "publish", "admin"],
+}
 
 
 def _database_is_available(database_url: str) -> bool:
@@ -24,13 +31,19 @@ def _database_is_available(database_url: str) -> bool:
 
 
 @pytest.fixture(autouse=True)
-def clear_settings_cache() -> None:
+def clear_settings_cache() -> Generator[None, None, None]:
     """Ensure tests never share cached settings state."""
     from app.core.settings import reset_settings_cache
 
     reset_settings_cache()
     yield
     reset_settings_cache()
+
+
+@pytest.fixture(autouse=True)
+def default_auth_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide explicit auth tokens for all tests exercising HTTP routes."""
+    monkeypatch.setenv("AUTH_TOKENS_JSON", json.dumps(DEFAULT_AUTH_TOKENS))
 
 
 @pytest.fixture(scope="session")

@@ -17,7 +17,7 @@ Make the read side of `aptitude-server` explicit and future-proof by separating 
 - Add direct relationship read APIs for authored `depends_on` and `extends` edges only; no transitive traversal or solver behavior.
 - Add exact metadata fetch and artifact streaming APIs with ordered batch reads and PostgreSQL-backed payload retrieval.
 - Preserve legacy combined search/fetch routes as deprecated compatibility facades during transition.
-- Keep the fetch contract aligned with the split-table PostgreSQL direction in `10-hybrid-artifact-storage-and-git-provenance.md`.
+- Keep the fetch contract aligned with the PostgreSQL-only storage direction in `10-postgres-only-artifact-storage-and-provenance.md`.
 
 ## Architecture Impact
 - Hardens the server/client boundary by making discovery, relationship lookup, and exact fetch separate public capabilities.

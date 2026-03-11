@@ -8,8 +8,10 @@ from pydantic import ValidationError
 
 from app.core.skill_registry import (
     CreateSkillVersionCommand,
+    ProvenanceMetadata,
     SkillChecksum,
     SkillContentInput,
+    SkillGovernanceInput,
     SkillIdentity,
     SkillMetadata,
     SkillMetadataInput,
@@ -18,6 +20,7 @@ from app.core.skill_registry import (
     SkillRelationshipsInput,
     SkillVersionDetail,
     SkillVersionReference,
+    SkillVersionStatusUpdate,
     SkillVersionSummary,
 )
 from app.core.skill_relationships import SkillRelationshipBatchItem
@@ -28,8 +31,10 @@ from app.interface.dto.skills import (
     CurrentSkillVersionResponse,
     DependencySelectorRequest,
     ExactRelationshipSelectorRequest,
+    ProvenanceResponse,
     RelationshipSelectorResponse,
     SkillContentSummaryResponse,
+    SkillGovernanceRequest,
     SkillIdentityResponse,
     SkillMetadataResponse,
     SkillMetadataSummaryResponse,
@@ -43,6 +48,7 @@ from app.interface.dto.skills import (
     SkillVersionReferenceResponse,
     SkillVersionRelationshipsResponse,
     SkillVersionResponse,
+    SkillVersionStatusResponse,
     SkillVersionSummaryResponse,
 )
 
@@ -72,6 +78,7 @@ def to_create_command(request: SkillVersionCreateRequest) -> CreateSkillVersionC
             maturity_score=request.metadata.maturity_score,
             security_score=request.metadata.security_score,
         ),
+        governance=_governance_input(request.governance),
         relationships=SkillRelationshipsInput(
             depends_on=tuple(
                 _dependency_selector(item) for item in request.relationships.depends_on
@@ -97,6 +104,8 @@ def to_skill_identity_response(identity: SkillIdentity) -> SkillIdentityResponse
             if identity.current_version is None
             else CurrentSkillVersionResponse(
                 version=identity.current_version.version,
+                lifecycle_status=identity.current_version.lifecycle_status,
+                trust_tier=identity.current_version.trust_tier,
                 published_at=identity.current_version.published_at,
             )
         ),
@@ -117,6 +126,9 @@ def to_version_response(detail: SkillVersionDetail) -> SkillVersionResponse:
             detail.content.rendered_summary,
         ),
         metadata=_metadata_response(detail.metadata),
+        lifecycle_status=detail.lifecycle_status,
+        trust_tier=detail.trust_tier,
+        provenance=_provenance_response(detail.provenance),
         relationships=SkillVersionRelationshipsResponse(
             depends_on=[_relationship_response(item) for item in detail.relationships.depends_on],
             extends=[_relationship_response(item) for item in detail.relationships.extends],
@@ -148,6 +160,8 @@ def to_version_summary_response(summary: SkillVersionSummary) -> SkillVersionSum
             description=summary.metadata.description,
             tags=list(summary.metadata.tags),
         ),
+        lifecycle_status=summary.lifecycle_status,
+        trust_tier=summary.trust_tier,
         published_at=summary.published_at,
     )
 
@@ -172,6 +186,8 @@ def to_related_version_response(reference: SkillVersionReference) -> SkillVersio
         name=reference.name,
         description=reference.description,
         tags=list(reference.tags),
+        lifecycle_status=reference.lifecycle_status,
+        trust_tier=reference.trust_tier,
         published_at=reference.published_at,
     )
 
@@ -216,6 +232,8 @@ def to_search_result_response(item: SkillSearchResult) -> SkillSearchResultRespo
         name=item.name,
         description=item.description,
         tags=list(item.tags),
+        lifecycle_status=item.lifecycle_status,
+        trust_tier=item.trust_tier,
         published_at=item.published_at,
         freshness_days=item.freshness_days,
         content_size_bytes=item.content_size_bytes,
@@ -223,6 +241,18 @@ def to_search_result_response(item: SkillSearchResult) -> SkillSearchResultRespo
         matched_fields=list(item.matched_fields),
         matched_tags=list(item.matched_tags),
         reasons=list(item.reasons),
+    )
+
+
+def to_version_status_response(update: SkillVersionStatusUpdate) -> SkillVersionStatusResponse:
+    """Convert a core lifecycle update result into the public schema."""
+    return SkillVersionStatusResponse(
+        slug=update.slug,
+        version=update.version,
+        status=update.status,
+        trust_tier=update.trust_tier,
+        lifecycle_changed_at=update.lifecycle_changed_at,
+        is_current_default=update.is_current_default,
     )
 
 
@@ -243,6 +273,21 @@ def _dependency_selector(item: DependencySelectorRequest) -> SkillRelationshipSe
 
 def _exact_selector(item: ExactRelationshipSelectorRequest) -> SkillRelationshipSelector:
     return SkillRelationshipSelector(slug=item.slug, version=item.version)
+
+
+def _governance_input(item: SkillGovernanceRequest) -> SkillGovernanceInput:
+    return SkillGovernanceInput(
+        trust_tier=item.trust_tier,
+        provenance=(
+            None
+            if item.provenance is None
+            else ProvenanceMetadata(
+                repo_url=item.provenance.repo_url,
+                commit_sha=item.provenance.commit_sha,
+                tree_path=item.provenance.tree_path,
+            )
+        ),
+    )
 
 
 def _checksum_response(checksum: SkillChecksum) -> ChecksumResponse:
@@ -272,6 +317,16 @@ def _metadata_response(metadata: SkillMetadata) -> SkillMetadataResponse:
         token_estimate=metadata.token_estimate,
         maturity_score=metadata.maturity_score,
         security_score=metadata.security_score,
+    )
+
+
+def _provenance_response(provenance: ProvenanceMetadata | None) -> ProvenanceResponse | None:
+    if provenance is None:
+        return None
+    return ProvenanceResponse(
+        repo_url=provenance.repo_url,
+        commit_sha=provenance.commit_sha,
+        tree_path=provenance.tree_path,
     )
 
 

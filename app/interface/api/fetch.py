@@ -7,7 +7,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Path, Response, status
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from app.core.dependencies import SkillFetchServiceDep
+from app.core.dependencies import ReadCallerDep, SkillFetchServiceDep
 from app.core.skill_registry import SkillVersionNotFoundError
 from app.interface.api.errors import error_response
 from app.interface.api.skill_api_support import to_version_response
@@ -80,10 +80,11 @@ def get_skill_version_metadata(
         Path(pattern=SEMVER_PATTERN, description="Exact immutable semantic version to fetch."),
     ],
     fetch_service: SkillFetchServiceDep,
+    caller: ReadCallerDep,
 ) -> SkillVersionResponse | JSONResponse:
     """Fetch one immutable version metadata projection without markdown bytes."""
     try:
-        stored = fetch_service.get_version_metadata(slug=slug, version=version)
+        stored = fetch_service.get_version_metadata(caller=caller, slug=slug, version=version)
         return to_version_response(stored)
     except SkillVersionNotFoundError as exc:
         return error_response(
@@ -115,10 +116,11 @@ def get_skill_version_content(
         Path(pattern=SEMVER_PATTERN, description="Exact immutable semantic version to fetch."),
     ],
     fetch_service: SkillFetchServiceDep,
+    caller: ReadCallerDep,
 ) -> Response | JSONResponse:
     """Return the raw markdown content for one immutable version."""
     try:
-        stored = fetch_service.get_content(slug=slug, version=version)
+        stored = fetch_service.get_content(caller=caller, slug=slug, version=version)
     except SkillVersionNotFoundError as exc:
         return error_response(
             status_code=status.HTTP_404_NOT_FOUND,

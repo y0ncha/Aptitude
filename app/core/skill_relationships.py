@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.core.governance import CallerIdentity, GovernancePolicy
 from app.core.ports import (
     ExactSkillCoordinate,
     RelationshipEdgeType,
@@ -40,13 +41,16 @@ class SkillRelationshipService:
         *,
         relationship_reader: SkillRelationshipReadPort,
         version_reader: SkillVersionReadPort,
+        governance_policy: GovernancePolicy,
     ) -> None:
         self._relationship_reader = relationship_reader
         self._version_reader = version_reader
+        self._governance_policy = governance_policy
 
     def get_direct_relationships(
         self,
         *,
+        caller: CallerIdentity,
         coordinates: tuple[ExactSkillCoordinate, ...],
         edge_types: tuple[RelationshipEdgeType, ...],
     ) -> tuple[SkillRelationshipBatchItem, ...]:
@@ -62,6 +66,11 @@ class SkillRelationshipService:
         for coordinate in coordinates:
             stored = source_by_key.get((coordinate.slug, coordinate.version))
             if stored is None:
+                continue
+            if not self._governance_policy.is_visible_in_list(
+                caller=caller,
+                lifecycle_status=stored.lifecycle_status,
+            ):
                 continue
 
             relationships: list[SkillRelationship] = []
@@ -97,9 +106,15 @@ class SkillRelationshipService:
                 name=item.name,
                 description=item.description,
                 tags=item.tags,
+                lifecycle_status=item.lifecycle_status,
+                trust_tier=item.trust_tier,
                 published_at=item.published_at,
             )
             for item in exact_target_summaries
+            if self._governance_policy.is_visible_in_list(
+                caller=caller,
+                lifecycle_status=item.lifecycle_status,
+            )
         }
 
         return tuple(
