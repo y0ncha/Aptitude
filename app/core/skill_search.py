@@ -61,14 +61,14 @@ class SkillSearchService:
             limit=query.limit,
         )
         stored_results = self._search_port.search_candidates(
-                request=SearchCandidatesRequest(
-                    query_text=normalized_request.query_text,
-                    required_tags=normalized_request.effective_tags,
-                    fresh_within_days=normalized_request.fresh_within_days,
-                    max_content_size_bytes=normalized_request.max_footprint_bytes,
-                    limit=normalized_request.limit,
-                )
+            request=SearchCandidatesRequest(
+                query_text=normalized_request.query_text,
+                required_tags=normalized_request.effective_tags,
+                fresh_within_days=normalized_request.fresh_within_days,
+                max_content_size_bytes=normalized_request.max_footprint_bytes,
+                limit=normalized_request.limit,
             )
+        )
         current_time = datetime.now(UTC)
 
         results = tuple(

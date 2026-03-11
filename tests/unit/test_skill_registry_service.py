@@ -61,9 +61,7 @@ class FakeRegistry:
 
     def get_skill(self, *, slug: str) -> StoredSkillIdentity | None:
         versions = [
-            record
-            for (stored_slug, _), record in self._records.items()
-            if stored_slug == slug
+            record for (stored_slug, _), record in self._records.items() if stored_slug == slug
         ]
         if not versions:
             return None

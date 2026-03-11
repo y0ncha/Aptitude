@@ -48,8 +48,7 @@ class FakeVersionReader:
         return tuple(
             summary
             for coordinate in coordinates
-            if (summary := self._summaries.get((coordinate.slug, coordinate.version)))
-            is not None
+            if (summary := self._summaries.get((coordinate.slug, coordinate.version))) is not None
         )
 
 

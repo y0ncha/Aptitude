@@ -439,9 +439,7 @@ def _to_legacy_manifest_json(command: CreateSkillVersionCommand) -> dict[str, An
         "name": command.metadata.name,
         "description": command.metadata.description,
         "tags": list(command.metadata.tags),
-        "depends_on": [
-            _selector_to_legacy_json(item) for item in command.relationships.depends_on
-        ],
+        "depends_on": [_selector_to_legacy_json(item) for item in command.relationships.depends_on],
         "extends": [_selector_to_legacy_json(item) for item in command.relationships.extends],
         "conflicts_with": [
             _selector_to_legacy_json(item) for item in command.relationships.conflicts_with

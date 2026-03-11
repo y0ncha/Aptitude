@@ -190,9 +190,7 @@ def upgrade() -> None:
 
     bind = op.get_bind()
     bind.execute(
-        sa.text(
-            "UPDATE skills SET slug = skill_id, updated_at = created_at WHERE slug IS NULL"
-        )
+        sa.text("UPDATE skills SET slug = skill_id, updated_at = created_at WHERE slug IS NULL")
     )
 
     version_rows = bind.execute(

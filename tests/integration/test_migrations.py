@@ -150,9 +150,7 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
                     FROM skill_versions
                     """
                 ),
-                {
-                    "digest": "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"
-                },
+                {"digest": "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"},
             )
     finally:
         engine.dispose()
@@ -162,9 +160,10 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
     upgraded_engine = create_engine(require_integration_database)
     try:
         with upgraded_engine.connect() as connection:
-            content_row = connection.execute(
-                text(
-                    """
+            content_row = (
+                connection.execute(
+                    text(
+                        """
                     SELECT sc.raw_markdown, sm.name, s.slug
                     FROM skill_versions AS sv
                     JOIN skills AS s ON s.id = sv.skill_fk
@@ -172,8 +171,11 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
                     JOIN skill_metadata AS sm ON sm.id = sv.metadata_fk
                     WHERE s.slug = 'migration.source'
                     """
+                    )
                 )
-            ).mappings().one()
+                .mappings()
+                .one()
+            )
             assert content_row["raw_markdown"] == "# Migration Source\n"
             assert content_row["name"] == "Migration Source"
             assert content_row["slug"] == "migration.source"
@@ -191,15 +193,19 @@ def test_0005_backfills_normalized_tables_from_legacy_rows(
             ).scalar_one()
             assert dependency_row == "depends_on"
 
-            search_row = connection.execute(
-                text(
-                    """
+            search_row = (
+                connection.execute(
+                    text(
+                        """
                     SELECT slug, normalized_slug, content_size_bytes
                     FROM skill_search_documents
                     WHERE slug = 'migration.source'
                     """
+                    )
                 )
-            ).mappings().one()
+                .mappings()
+                .one()
+            )
             assert search_row["normalized_slug"] == "migration.source"
             assert search_row["content_size_bytes"] == len(b"# Migration Source\n")
     finally:

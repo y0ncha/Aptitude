@@ -29,6 +29,7 @@ from app.interface.dto.skills import (
     DependencySelectorRequest,
     ExactRelationshipSelectorRequest,
     RelationshipSelectorResponse,
+    SkillContentSummaryResponse,
     SkillIdentityResponse,
     SkillMetadataResponse,
     SkillMetadataSummaryResponse,

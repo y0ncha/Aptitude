@@ -115,9 +115,7 @@ class SkillRelationshipService:
                             target_version=(
                                 None
                                 if item.selector.version is None
-                                else target_by_key.get(
-                                    (item.selector.slug, item.selector.version)
-                                )
+                                else target_by_key.get((item.selector.slug, item.selector.version))
                             ),
                         )
                         for item in authored_relationships[(coordinate.slug, coordinate.version)]

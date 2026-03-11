@@ -19,3 +19,12 @@ command = "make test"
 name = "Debug"
 icon = "debug"
 command = "make debug"
+
+[[actions]]
+name = "Lint"
+icon = "tool"
+command = '''
+make format
+make typecheck
+make lint
+'''
