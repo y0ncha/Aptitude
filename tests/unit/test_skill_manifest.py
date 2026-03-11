@@ -1,145 +1,129 @@
-"""Unit tests for skill manifest validation rules."""
+"""Unit tests for normalized skill DTO validation rules."""
 
 from __future__ import annotations
-
-import json
 
 import pytest
 from pydantic import ValidationError
 
-from app.interface.api.skills import SkillManifest, _validation_errors
+from app.interface.dto.skills import SkillRelationshipBatchRequest, SkillVersionCreateRequest
+
+
+def _request() -> dict[str, object]:
+    return {
+        "slug": "python.lint",
+        "version": "1.2.3",
+        "content": {"raw_markdown": "# Python Lint\n"},
+        "metadata": {"name": "Python Lint", "tags": ["python", "lint"]},
+        "relationships": {
+            "depends_on": [],
+            "extends": [],
+            "conflicts_with": [],
+            "overlaps_with": [],
+        },
+    }
 
 
 @pytest.mark.unit
-def test_skill_manifest_accepts_forward_compatible_relationship_fields() -> None:
-    manifest = SkillManifest.model_validate(
+def test_publish_request_accepts_all_relationship_families() -> None:
+    request = SkillVersionCreateRequest.model_validate(
         {
-            "schema_version": "1.0",
-            "skill_id": "python.lint",
-            "version": "1.2.3",
-            "name": "Python Lint",
-            "description": "Linting skill",
-            "tags": ["python", "lint"],
-            "depends_on": [{"skill_id": "core.base", "version": "1.0.0"}],
-            "extends": [{"skill_id": "python.base", "version": "2.0.0"}],
-            "conflicts_with": [{"skill_id": "ruby.lint", "version": "1.0.0"}],
-            "overlaps_with": [{"skill_id": "python.format", "version": "1.0.0"}],
-        },
+            **_request(),
+            "relationships": {
+                "depends_on": [{"slug": "core.base", "version": "1.0.0"}],
+                "extends": [{"slug": "python.base", "version": "2.0.0"}],
+                "conflicts_with": [{"slug": "ruby.lint", "version": "1.0.0"}],
+                "overlaps_with": [{"slug": "python.format", "version": "1.0.0"}],
+            },
+        }
     )
 
-    assert manifest.skill_id == "python.lint"
-    assert manifest.version == "1.2.3"
-    assert manifest.depends_on is not None
-    assert manifest.depends_on[0].version == "1.0.0"
+    assert request.slug == "python.lint"
+    assert request.relationships.depends_on[0].version == "1.0.0"
+    assert request.relationships.conflicts_with[0].slug == "ruby.lint"
 
 
 @pytest.mark.unit
-def test_skill_manifest_accepts_dependency_constraints_and_optional_markers() -> None:
-    manifest = SkillManifest.model_validate(
+def test_publish_request_accepts_dependency_constraints_and_markers() -> None:
+    request = SkillVersionCreateRequest.model_validate(
         {
-            "schema_version": "1.0",
-            "skill_id": "python.lint",
-            "version": "1.2.3",
-            "name": "Python Lint",
-            "depends_on": [
-                {
-                    "skill_id": "core.base",
-                    "version_constraint": ">=1.0.0,<2.0.0",
-                    "optional": True,
-                    "markers": ["linux", "gpu"],
-                }
-            ],
-        },
-    )
-
-    assert manifest.depends_on is not None
-    assert manifest.depends_on[0].version is None
-    assert manifest.depends_on[0].version_constraint == ">=1.0.0,<2.0.0"
-    assert manifest.depends_on[0].optional is True
-    assert manifest.depends_on[0].markers == ["linux", "gpu"]
-
-
-@pytest.mark.unit
-def test_skill_manifest_rejects_ambiguous_dependency_version_selectors() -> None:
-    with pytest.raises(ValidationError):
-        SkillManifest.model_validate(
-            {
-                "schema_version": "1.0",
-                "skill_id": "python.lint",
-                "version": "1.2.3",
-                "name": "Python Lint",
+            **_request(),
+            "relationships": {
                 "depends_on": [
                     {
-                        "skill_id": "core.base",
-                        "version": "1.0.0",
+                        "slug": "core.base",
                         "version_constraint": ">=1.0.0,<2.0.0",
+                        "optional": True,
+                        "markers": ["linux", "gpu"],
                     }
-                ],
+                ]
             },
-        )
+        }
+    )
+
+    depends_on = request.relationships.depends_on[0]
+    assert depends_on.version is None
+    assert depends_on.version_constraint == ">=1.0.0,<2.0.0"
+    assert depends_on.optional is True
+    assert depends_on.markers == ["linux", "gpu"]
 
 
 @pytest.mark.unit
-def test_skill_manifest_rejects_invalid_dependency_constraint_syntax() -> None:
+def test_publish_request_rejects_ambiguous_dependency_version_selectors() -> None:
     with pytest.raises(ValidationError):
-        SkillManifest.model_validate(
+        SkillVersionCreateRequest.model_validate(
             {
-                "schema_version": "1.0",
-                "skill_id": "python.lint",
-                "version": "1.2.3",
-                "name": "Python Lint",
-                "depends_on": [
-                    {
-                        "skill_id": "core.base",
-                        "version_constraint": "latest",
-                    }
-                ],
-            },
+                **_request(),
+                "relationships": {
+                    "depends_on": [
+                        {
+                            "slug": "core.base",
+                            "version": "1.0.0",
+                            "version_constraint": ">=1.0.0,<2.0.0",
+                        }
+                    ]
+                },
+            }
         )
 
 
 @pytest.mark.unit
-def test_validation_errors_for_dependency_declarations_are_json_serializable() -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        SkillManifest.model_validate(
-            {
-                "schema_version": "1.0",
-                "skill_id": "python.lint",
-                "version": "1.2.3",
-                "name": "Python Lint",
-                "depends_on": [{"skill_id": "core.base"}],
-            },
-        )
-
-    errors = _validation_errors(exc_info.value)
-
-    assert errors[0]["type"] == "value_error"
-    assert "exactly one of `version` or `version_constraint`" in errors[0]["msg"]
-    json.dumps({"errors": errors})
-
-
-@pytest.mark.unit
-def test_skill_manifest_rejects_non_semver_version() -> None:
+def test_publish_request_rejects_invalid_dependency_constraint_syntax() -> None:
     with pytest.raises(ValidationError):
-        SkillManifest.model_validate(
+        SkillVersionCreateRequest.model_validate(
             {
-                "schema_version": "1.0",
-                "skill_id": "python.lint",
-                "version": "v1",
-                "name": "Python Lint",
-            },
+                **_request(),
+                "relationships": {
+                    "depends_on": [{"slug": "core.base", "version_constraint": "latest"}]
+                },
+            }
         )
 
 
 @pytest.mark.unit
-def test_skill_manifest_rejects_unknown_fields() -> None:
+def test_publish_request_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
-        SkillManifest.model_validate(
-            {
-                "schema_version": "1.0",
-                "skill_id": "python.lint",
-                "version": "1.0.0",
-                "name": "Python Lint",
-                "extra_field": "not allowed",
-            },
-        )
+        SkillVersionCreateRequest.model_validate({**_request(), "extra_field": "not allowed"})
+
+
+@pytest.mark.unit
+def test_relationship_batch_request_uses_independent_default_edge_type_lists() -> None:
+    first = SkillRelationshipBatchRequest.model_validate(
+        {"coordinates": [{"slug": "python.lint", "version": "1.0.0"}]}
+    )
+    second = SkillRelationshipBatchRequest.model_validate(
+        {"coordinates": [{"slug": "python.format", "version": "2.0.0"}]}
+    )
+
+    assert first.edge_types == [
+        "depends_on",
+        "extends",
+        "conflicts_with",
+        "overlaps_with",
+    ]
+    assert second.edge_types == [
+        "depends_on",
+        "extends",
+        "conflicts_with",
+        "overlaps_with",
+    ]
+    assert first.edge_types is not second.edge_types

@@ -112,7 +112,7 @@ primitives. The server does not perform the agent's reasoning or final choice.
 ### Exact Fetch and Execution Flow
 
 1. client selects concrete `(skill_id, version)` coordinates.
-2. client fetches immutable metadata and artifact references from the server.
+2. client fetches immutable metadata and artifact identity from the server.
 3. client verifies checksums, expands dependencies, and builds a lock.
 4. client produces the execution plan and trace output.
 
@@ -123,7 +123,7 @@ primitives. The server does not perform the agent's reasoning or final choice.
 - Support deterministic candidate retrieval with stable tie-breaks.
 - Return compact search results so clients do not over-fetch full manifests
   during discovery.
-- Serve exact immutable version records and artifact metadata for selected versions.
+- Serve exact immutable version records and artifact identity for selected versions.
 - Enforce publish/read governance and lifecycle visibility.
 - Optionally maintain denormalized read models and secondary indexes when they
   improve query performance, as long as they do not become the source of truth
@@ -219,8 +219,7 @@ The client output should include:
 
 ## Boundary Rules (Hard)
 
-- client cannot read or write server DB tables, object store internals, or
-  private services directly.
+- client cannot read or write server DB tables or private services directly.
 - Server cannot be the source of truth for runtime dependency resolution outcomes.
 - Search retrieval on metadata and descriptions belongs to the server.
 - Prompt interpretation, reranking, and final selection belong to the client.

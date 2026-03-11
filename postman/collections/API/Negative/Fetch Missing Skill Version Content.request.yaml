@@ -1,0 +1,32 @@
+$kind: http-request
+order: 7000
+
+method: GET
+url: '{{baseUrl}}/skills/{{negative_missing_slug}}/versions/{{negative_missing_version}}/content'
+
+headers:
+  - key: Accept
+    value: application/json
+    description: Expect a normalized not-found error response for content fetch
+
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const json = pm.response.json();
+
+      pm.test('Status is 404', () => {
+        pm.response.to.have.status(404);
+      });
+
+      pm.test('Missing content fetch returns the normalized API error envelope', () => {
+        pm.expect(json.error.code).to.eql('SKILL_VERSION_NOT_FOUND');
+        pm.expect(json.error.details.slug).to.eql(
+          pm.collectionVariables.get('negative_missing_slug'),
+        );
+        pm.expect(json.error.details.version).to.eql(
+          pm.collectionVariables.get('negative_missing_version'),
+        );
+      });
+
+      pm.execution.setNextRequest(pm.response.code === 404 ? 'Search Skills Without Selector' : null);

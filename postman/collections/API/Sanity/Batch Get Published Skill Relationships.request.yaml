@@ -1,0 +1,59 @@
+$kind: http-request
+order: 13000
+
+method: POST
+url: '{{baseUrl}}/resolution/relationships:batch'
+
+headers:
+  - key: Accept
+    value: application/json
+    description: Request the direct immutable relationships for the latest published version
+  - key: Content-Type
+    value: application/json
+    description: Send a relationship batch request body
+
+body:
+  type: json
+  content: |-
+    {
+      "coordinates": [
+        {
+          "slug": "{{sanity_primary_slug}}",
+          "version": "{{sanity_version_2}}"
+        }
+      ]
+    }
+
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const json = pm.response.json();
+      const result = json.results[0];
+      const edgeTypes = result.relationships.map((item) => item.edge_type);
+
+      pm.test('Status is 200', () => {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Relationship batch returns the expected edge families and targets', () => {
+        pm.expect(result.status).to.eql('found');
+        pm.expect(edgeTypes).to.eql([
+          'depends_on',
+          'extends',
+          'conflicts_with',
+          'overlaps_with',
+        ]);
+        pm.expect(result.relationships[0].target_version.slug).to.eql(
+          pm.collectionVariables.get('sanity_dependency_slug'),
+        );
+        pm.expect(result.relationships[1].target_version.slug).to.eql(
+          pm.collectionVariables.get('sanity_extension_slug'),
+        );
+        pm.expect(result.relationships[2].target_version).to.eql(null);
+        pm.expect(result.relationships[3].target_version.slug).to.eql(
+          pm.collectionVariables.get('sanity_overlap_slug'),
+        );
+      });
+
+      pm.execution.setNextRequest(pm.response.code === 200 ? 'Publish Invalid Request' : null);

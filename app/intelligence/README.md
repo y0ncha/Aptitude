@@ -1,13 +1,13 @@
 # app.intelligence module
 
-Placeholder package for future intelligence capabilities.
+Pure ranking, normalization, and metadata helper functions.
 
 ## Purpose
 
-Reserved for metadata enrichment, relationship graph features, and other
-intelligence-layer responsibilities described in project docs.
+Holds execution-agnostic intelligence helpers that core services can call
+without taking on persistence or HTTP concerns.
 
 ## Current State
 
-- No runtime implementation yet.
-- Keep this README updated when real modules are introduced.
+- `search_ranking.py`: query normalization, explanation generation, and audit-payload redaction for advisory search.
+- Future metadata enrichment and relationship graph helpers should follow the same pure-function pattern.

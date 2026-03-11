@@ -1,62 +1,91 @@
 $kind: http-request
-name: Publish Skill v1
-order: 3000
+order: 6000
 
 method: POST
-url: "{{baseUrl}}/skills/publish"
+url: '{{baseUrl}}/skill-versions'
 
 headers:
   - key: Accept
     value: application/json
     description: Expect the created immutable skill version metadata
+  - key: Content-Type
+    value: application/json
+    description: Send the normalized JSON publish contract
 
 body:
-  type: formdata
-  content:
-    - type: text
-      key: manifest
-      value: "{{sanity_manifest}}"
-      description: Collection-generated manifest for the first sanity publish
-      disabled: false
-    - type: file
-      key: artifact
-      src:
-        - postman-cloud:///1f11c04f-6778-4170-bed0-59a0db4b13aa
-      description: Local artifact fixture uploaded with the publish request
-      disabled: false
+  type: json
+  content: |-
+    {
+      "slug": "{{sanity_primary_slug}}",
+      "version": "{{sanity_version_1}}",
+      "content": {
+        "raw_markdown": "# Postman Primary Skill v1\n\nRun `{{runId}}` primary skill version 1.\n",
+        "rendered_summary": "Postman primary skill version 1."
+      },
+      "metadata": {
+        "name": "Postman Primary Skill",
+        "description": "Primary sanity skill for collection coverage",
+        "tags": ["postman", "sanity", "primary"],
+        "headers": {
+          "runtime": "python"
+        },
+        "inputs_schema": {
+          "type": "object"
+        },
+        "outputs_schema": {
+          "type": "object"
+        },
+        "token_estimate": 200,
+        "maturity_score": 0.9,
+        "security_score": 0.95
+      },
+      "relationships": {
+        "depends_on": [
+          {
+            "slug": "{{sanity_dependency_slug}}",
+            "version": "{{sanity_version_1}}",
+            "optional": false,
+            "markers": ["linux"]
+          }
+        ],
+        "extends": [
+          {
+            "slug": "{{sanity_extension_slug}}",
+            "version": "{{sanity_version_1}}"
+          }
+        ],
+        "conflicts_with": [
+          {
+            "slug": "postman.conflict.{{runId}}",
+            "version": "9.9.9"
+          }
+        ],
+        "overlaps_with": [
+          {
+            "slug": "{{sanity_overlap_slug}}",
+            "version": "{{sanity_version_1}}"
+          }
+        ]
+      }
+    }
 
 scripts:
   - type: afterResponse
-    code: >-
-      let json = null;
-
-      try {
-        json = pm.response.json();
-      } catch (error) {
-        json = null;
-      }
-
+    language: text/javascript
+    code: |-
+      const json = pm.response.json();
 
       pm.test('Status is 201', () => {
         pm.response.to.have.status(201);
       });
 
-
       pm.test('Publish v1 response matches the requested identity', () => {
-        pm.expect(json).to.be.an('object');
-        pm.expect(json.skill_id).to.eql(pm.collectionVariables.get('sanity_skill_id'));
+        pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));
         pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_1'));
-        pm.expect(json.checksum.algorithm).to.eql('sha256');
-        pm.expect(json.artifact_metadata.relative_path).to.be.a('string').and.not.empty;
+        pm.expect(json.version_checksum.algorithm).to.eql('sha256');
+        pm.expect(json.content_download_path).to.eql(
+          `/skills/${pm.collectionVariables.get('sanity_primary_slug')}/versions/${pm.collectionVariables.get('sanity_version_1')}/content`,
+        );
       });
 
-
-      if (pm.response.code === 201 && json) {
-        pm.collectionVariables.set('published_skill_id', json.skill_id);
-        pm.collectionVariables.set('published_version_latest', json.version);
-      }
-
-
-      pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Skill v2'
-      : null);
-    language: text/javascript
+      pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Skill v2' : null);

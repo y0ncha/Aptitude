@@ -1,0 +1,32 @@
+$kind: http-request
+order: 12000
+
+method: GET
+url: '{{baseUrl}}/discovery/skills/search?q={{sanity_primary_slug}}&limit=5'
+
+headers:
+  - key: Accept
+    value: application/json
+    description: Search discovery metadata for the latest published primary skill
+
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const json = pm.response.json();
+      const first = json.results[0];
+
+      pm.test('Status is 200', () => {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Search returns the latest published skill candidate', () => {
+        pm.expect(json.results).to.be.an('array').and.not.empty;
+        pm.expect(first.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));
+        pm.expect(first.version).to.eql(pm.collectionVariables.get('sanity_version_2'));
+        pm.expect(first.content_size_bytes).to.be.a('number').and.greaterThan(0);
+      });
+
+      pm.execution.setNextRequest(
+        pm.response.code === 200 ? 'Batch Get Published Skill Relationships' : null,
+      );

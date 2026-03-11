@@ -12,7 +12,7 @@ Support publish and fetch of `skill@version` with strict immutability and integr
 ## Scope
 - Define `SkillManifest` schema and validation.
 - Persist versioned skill records in DB.
-- Store artifact files in immutable path layout.
+- Store immutable artifact payloads in PostgreSQL.
 - Compute and store checksums.
 - Expose publish/fetch/list endpoints as immutable retrieval primitives for client-owned search, selection, and solve flows.
 - Keep all writes API-mediated; no direct client writes to server persistence.
@@ -27,8 +27,8 @@ Support publish and fetch of `skill@version` with strict immutability and integr
 - Endpoint: `POST /skills/publish`.
 - Endpoint: `GET /skills/{id}/{version}`.
 - Endpoint: `GET /skills/{id}` for version listing.
-- Tables for skills, versions, checksums, and provenance basics.
-- Immutable artifact storage convention.
+- Tables for skills, versions, artifact payloads, checksums, and provenance basics.
+- Immutable PostgreSQL storage convention for small whole-document skill artifacts.
 - Audit event emission for publish and read.
 - Learning note on idempotency and immutable data modeling.
 

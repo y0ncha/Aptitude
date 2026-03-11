@@ -7,7 +7,7 @@ url: '{{baseUrl}}/readyz'
 headers:
   - key: Accept
     value: application/json
-    description: 'Request a JSON readiness response'
+    description: Request a JSON readiness response
 
 scripts:
   - type: afterResponse
@@ -26,4 +26,4 @@ scripts:
         ).to.eql(true);
       });
 
-      pm.execution.setNextRequest(pm.response.code === 200 ? 'Publish Skill v1' : null);
+      pm.execution.setNextRequest(pm.response.code === 200 ? 'Publish Dependency Skill' : null);

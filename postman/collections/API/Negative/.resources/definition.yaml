@@ -2,7 +2,7 @@ $kind: collection
 
 name: Negative
 description: |-
-  Deterministic failure cases for the Aptitude Skills API.
+  Deterministic negative coverage for the Aptitude Skills API.
 
-  These requests avoid stateful dependencies so they can be run independently
-  and still assert stable validation or not-found responses.
+  These requests include their own setup for the duplicate-publish path so the
+  folder can still be run independently.

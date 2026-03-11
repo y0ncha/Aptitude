@@ -3,6 +3,3 @@ values:
   - key: baseUrl
     value: 'http://localhost:8000'
     enabled: true
-  - key: artifactFilePath
-    value: '/Users/yonatan/Dev/Aptitude/aptitude-server/postman/assets/sanity-artifact.md'
-    enabled: true

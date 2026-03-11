@@ -7,7 +7,14 @@ description: |-
   Expected run order:
     1. Healthz
     2. Readyz
-    3. Publish Skill v1
-    4. Publish Skill v2
-    5. Fetch Published Skill
-    6. List Published Skill Versions
+    3. Publish Dependency Skill
+    4. Publish Extension Skill
+    5. Publish Overlap Skill
+    6. Publish Skill v1
+    7. Publish Skill v2
+    8. Get Published Skill Identity
+    9. List Published Skill Versions
+    10. Fetch Published Skill Metadata
+    11. Fetch Published Skill Content
+    12. Search Published Skills
+    13. Batch Get Published Skill Relationships

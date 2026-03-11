@@ -9,9 +9,13 @@ from app.main import create_app
 _EXPECTED_PUBLIC_PATHS = {
     "/healthz",
     "/readyz",
-    "/skills/publish",
-    "/skills/{skill_id}/{version}",
-    "/skills/{skill_id}",
+    "/discovery/skills/search",
+    "/resolution/relationships:batch",
+    "/skill-versions",
+    "/skills/{slug}",
+    "/skills/{slug}/versions",
+    "/skills/{slug}/versions/{version}",
+    "/skills/{slug}/versions/{version}/content",
 }
 _FORBIDDEN_PATHS = (
     "/resolve",

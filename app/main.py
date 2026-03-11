@@ -16,11 +16,16 @@ from app.audit.recorder import SQLAlchemyAuditRecorder
 from app.core.logging import build_logging_config, configure_logging
 from app.core.readiness import ReadinessService
 from app.core.settings import get_settings, reset_settings_cache
+from app.core.skill_discovery import SkillDiscoveryService
+from app.core.skill_fetch import SkillFetchService
 from app.core.skill_registry import SkillRegistryService
+from app.core.skill_relationships import SkillRelationshipService
+from app.interface.api.discovery import router as discovery_router
 from app.interface.api.errors import request_validation_exception_handler
+from app.interface.api.fetch import router as fetch_router
 from app.interface.api.health import router as health_router
+from app.interface.api.resolution import router as resolution_router
 from app.interface.api.skills import router as skills_router
-from app.persistence.artifact_store import FileSystemArtifactStore
 from app.persistence.db import (
     SQLAlchemyDatabaseReadinessProbe,
     dispose_engine,
@@ -46,8 +51,9 @@ logger = logging.getLogger(__name__)
 
 API_VERSION = "1.0.0"
 API_DESCRIPTION = """
-Registry-first API for immutable skill publication, exact version retrieval, and
-version listing.
+Registry-first API for immutable skill publication, indexed search candidate
+retrieval, direct relationship reads, exact version retrieval, artifact streaming,
+and version listing.
 
 The server owns data-local registry operations only. Prompt interpretation,
 reranking, dependency solving, final selection, lock generation, and execution
@@ -67,8 +73,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     audit_recorder = SQLAlchemyAuditRecorder(session_factory=session_factory)
     app.state.skill_registry_service = SkillRegistryService(
         registry=registry_repository,
-        artifact_store=FileSystemArtifactStore(root_dir=settings.artifact_root_dir),
         audit_recorder=audit_recorder,
+    )
+    app.state.skill_discovery_service = SkillDiscoveryService(
+        search_port=registry_repository,
+        audit_recorder=audit_recorder,
+    )
+    app.state.skill_fetch_service = SkillFetchService(
+        version_reader=registry_repository,
+    )
+    app.state.skill_relationship_service = SkillRelationshipService(
+        relationship_reader=registry_repository,
+        version_reader=registry_repository,
     )
     logger.info("service startup complete")
     try:
@@ -91,9 +107,12 @@ def create_app() -> FastAPI:
     )
     app.add_exception_handler(
         RequestValidationError,
-        cast(ExceptionHandler, request_validation_exception_handler),
+        cast(ExceptionHandler, cast(object, request_validation_exception_handler)),
     )
     app.include_router(health_router)
+    app.include_router(discovery_router)
+    app.include_router(resolution_router)
+    app.include_router(fetch_router)
     app.include_router(skills_router)
     return app
 

@@ -1,10 +1,16 @@
 # aptitude-server
 
-![Python Version](https://img.shields.io/badge/python-3.12+-3776AB?logo=python)
-![License](https://img.shields.io/github/license/y0ncha/aptitude-server)
-![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude-server)
-![Issues](https://img.shields.io/github/issues/y0ncha/aptitude-server)
-![Status](https://img.shields.io/badge/status-active--development-blue)
+![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![uv](https://img.shields.io/badge/uv-managed-6E56CF?style=for-the-badge&logo=uv&logoColor=white)
+![FastAPI](https://img.shields.io/badge/fastapi-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Pydantic](https://img.shields.io/badge/pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/sqlalchemy-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white)
+![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+![pytest](https://img.shields.io/badge/pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![Ruff](https://img.shields.io/badge/ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=111111)
+![Docker](https://img.shields.io/badge/docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+[![DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-0A66C2?style=for-the-badge&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAsVBMVEVHcEwmWMYZy38Akt0gwZoSaFIbYssUmr4gwJkBlN4WbNE4acofwZkBj9k4aMkBk94WgM0bsIM4aMkewJc2ZMM3Z8cbvIwYpHsewJYAftgBkt0fvpgBkt0cv44cv5wzYckAjtsCk90pasUboXsgwJkfwpYfwJg4aMoct44yXswAkd0BkN84Z8cBktwduZIjcO85lM4hwZo5acoBleA6a88iyaABmOQ8b9QhxZ0CnOoizaOW4DOvAAAAMHRSTlMAKCfW%2FAgWA%2F7%2FDfvMc9j7MU%2Frj3XBcRW%2FJMbe7kUxjI%2FlUzzz6tPQkJ%2BjVmW1oeulmmslAAAByUlEQVQ4y32Tia6jIBSGUVFcqliXtlq73rm3d50ERNC%2B%2F4PNQetoptMeE0PgC%2F9%2FFhCaBSH9Hz2J%2BONgPDl2DolSUWY%2FPL8oEQRCfPxHpFc3Ah5wHoiI6I05NXgjAOgQF3Jn1Dlo4XMPDDes09UE2d%2BREvl3lijBg4CrHNmrbcM2u9u5nwsRcAFfFHFY5sZ607Yua3GqpQiKE6G9cZHZThblZ4T2mLnMxde3ATASMUj72o0Pbs1fADDcLHqAjEDugJ3lC%2BztMGYTADcoLaFyH%2B02DP9%2BWS4ahrXE4laALFKcq8vZfscNY8312mxfr27bLJZjnsYhSDIHmUxLu9h9N%2Fep%2B7pazwoZQw%2B1Nwi33epu7c2p8RooeqCdAHMGoOJIq3CUwIMEniRIaHVe3ZVnO2Vgsh1MstEkQUXVUc%2BjXfk3zbemxS6%2BpQmlPtUeALJ8VKj4JHvAelBqFFdSS3h1SPzQKr%2F%2BaRa0%2B0cCIWtJLauG5U%2FfbgyG01uiNqQhyzA8ddKj1OvK28AsZyN3DKE4X6AEWrU1jJx9N7RFpdPxpHU%2FtMOQG9SjfTp3Yz8KgRVKpfx88Dqhpseq606h%2F%2Bzxfh6LJ8eEDKWbxx9XEDwqzP1SVgAAAABJRU5ErkJggg%3D%3D)](https://deepwiki.com/y0ncha/aptitude-server)
+![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude-server?style=for-the-badge)
 
 `aptitude-server` is the registry service in the Aptitude ecosystem.
 It stores immutable skill artifacts and versioned metadata so clients can
@@ -56,13 +62,13 @@ Implemented now:
 - Immutable publish API for skill manifest + artifact
 - Exact fetch by `skill_id` and `version`
 - Version listing per skill
+- Indexed advisory search over metadata and descriptions
 - Checksum verification on artifact reads
 - PostgreSQL-backed metadata persistence and filesystem artifact storage
 - Direct dependency declaration validation and retrieval
 
 Planned next:
 
-- Search and candidate retrieval APIs
 - Richer governance and lifecycle controls
 - Discovery metadata and evaluation signals
 
@@ -73,16 +79,13 @@ Available endpoints today:
 - `GET /healthz`
 - `GET /readyz`
 - `POST /skills/publish`
+- `GET /skills/search`
 - `GET /skills/{skill_id}/{version}`
 - `GET /skills/{skill_id}`
 
-Planned but not yet implemented:
-
-- `GET /skills/search`
-
-Search remains a future discovery API for candidate generation only. When it is
-added, prompt interpretation, reranking, final selection, dependency solving,
-and execution planning will remain client-owned responsibilities.
+`GET /skills/search` is a discovery API for candidate generation only. Prompt
+interpretation, reranking, final selection, dependency solving, and execution
+planning remain client-owned responsibilities.
 
 When the service is running locally, OpenAPI docs are available at
 `http://127.0.0.1:8000/docs`.

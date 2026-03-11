@@ -22,6 +22,7 @@ from app.persistence.models import (
     audit_event,  # noqa: F401
     skill,  # noqa: F401
     skill_relationship_edge,  # noqa: F401
+    skill_search_document,  # noqa: F401
     skill_version,  # noqa: F401
     skill_version_checksum,  # noqa: F401
 )

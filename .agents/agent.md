@@ -13,7 +13,14 @@ policy governance, and auditable outcomes.
 5. Roadmap and sequencing: [`plans/roadmap.md`](plans/roadmap.md)
 6. Plan execution files: `plans/XX-*.md` (append-only milestones)
 7. Stable repo facts: [`memory/meta.md`](memory/meta.md)
-8. Skills for TDD and Python + FastAPI back-end + Postgres best practices: [`skills`](skills/)
+8. Skills:
+   - [`skills/architect-review`](skills/architect-review) - system design and architecture best practices
+   - [`skills/fastapi`](skills/fastapi) - fastapi best practices
+   - [`skills/postgres-patterns`](skills/postgres-patterns) - postgres best practices
+   - [`skills/python-patterns`](skills/python-patterns) - python best practices
+   - [`skills/python-testing`](skills/python-patterns) - python testing best practices
+   - [`skills/prd`](skills/prd) - prd writing best practices
+
 
 If rules conflict, follow the highest item unless the server includes a newer explicit architecture decision.
 

@@ -13,11 +13,11 @@ metadata-oriented intelligence work.
 - `app/main.py`: FastAPI application creation, startup/shutdown wiring, and dev server runner with shared logging config + startup banner.
 - `app/audit/`: audit port adapters.
 - `app/core/`: domain services for immutable catalog reads/writes, settings, ports,
-  and dependency providers.
+  advisory search, and dependency providers.
 - `app/interface/`: API interface boundary.
 - `app/persistence/`: database/artifact adapters and ORM models for immutable
-  manifests, integrity metadata, and dependency declaration projections.
-- `app/intelligence/`: placeholder for metadata/graph intelligence.
+  manifests, integrity metadata, dependency declaration projections, and search read models.
+- `app/intelligence/`: search-ranking helpers and future metadata/graph intelligence.
 
 ## Update Rule
 

@@ -13,9 +13,22 @@ command = "make run"
 [[actions]]
 name = "Test"
 icon = "test"
-command = "make test"
+command = '''
+make db-up
+make migrate-up
+make test
+'''
 
 [[actions]]
 name = "Debug"
 icon = "debug"
 command = "make debug"
+
+[[actions]]
+name = "Lint"
+icon = "tool"
+command = '''
+make format
+make typecheck
+make lint
+'''

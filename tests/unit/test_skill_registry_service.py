@@ -1,4 +1,4 @@
-"""Unit tests for immutable skill registry core behavior."""
+"""Unit tests for normalized skill registry core behavior."""
 
 from __future__ import annotations
 
@@ -6,13 +6,20 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.core.ports import ArtifactWriteResult, StoredSkillVersion
+from app.core.ports import (
+    CreateSkillVersionRecord,
+    StoredSkillIdentity,
+    StoredSkillVersion,
+    StoredSkillVersionSummary,
+)
 from app.core.skill_registry import (
+    CreateSkillVersionCommand,
     DuplicateSkillVersionError,
-    IntegrityCheckFailedError,
-    SkillManifestData,
+    SkillContentInput,
+    SkillMetadataInput,
+    SkillNotFoundError,
     SkillRegistryService,
-    SkillVersionNotFoundError,
+    SkillRelationshipsInput,
 )
 
 
@@ -22,69 +29,69 @@ class FakeRegistry:
     def __init__(self) -> None:
         self._records: dict[tuple[str, str], StoredSkillVersion] = {}
 
-    def version_exists(self, skill_id: str, version: str) -> bool:
-        return (skill_id, version) in self._records
+    def version_exists(self, *, slug: str, version: str) -> bool:
+        return (slug, version) in self._records
 
-    def create_version(
-        self,
-        *,
-        manifest_json: dict[str, object],
-        artifact_relative_path: str,
-        artifact_size_bytes: int,
-        checksum: object,
-    ) -> StoredSkillVersion:
-        skill_id = str(manifest_json["skill_id"])
-        version = str(manifest_json["version"])
-        key = (skill_id, version)
+    def create_version(self, *, record: CreateSkillVersionRecord) -> StoredSkillVersion:
+        key = (record.slug, record.version)
         if key in self._records:
-            raise DuplicateSkillVersionError(skill_id=skill_id, version=version)
+            raise DuplicateSkillVersionError(slug=record.slug, version=record.version)
 
-        checksum_algorithm = str(checksum.algorithm)
-        checksum_digest = str(checksum.digest)
-        record = StoredSkillVersion(
-            skill_id=skill_id,
-            version=version,
-            manifest_json=manifest_json,
-            artifact_relative_path=artifact_relative_path,
-            artifact_size_bytes=artifact_size_bytes,
-            checksum_algorithm=checksum_algorithm,
-            checksum_digest=checksum_digest,
+        stored = StoredSkillVersion(
+            slug=record.slug,
+            version=record.version,
+            version_checksum_digest=record.version_checksum_digest,
+            content_checksum_digest=record.content.checksum_digest,
+            content_size_bytes=record.content.size_bytes,
+            rendered_summary=record.content.rendered_summary,
+            name=record.metadata.name,
+            description=record.metadata.description,
+            tags=record.metadata.tags,
+            headers=record.metadata.headers,
+            inputs_schema=record.metadata.inputs_schema,
+            outputs_schema=record.metadata.outputs_schema,
+            token_estimate=record.metadata.token_estimate,
+            maturity_score=record.metadata.maturity_score,
+            security_score=record.metadata.security_score,
             published_at=datetime.now(tz=UTC),
+            relationships=(),
         )
-        self._records[key] = record
-        return record
+        self._records[key] = stored
+        return stored
 
-    def get_version(self, skill_id: str, version: str) -> StoredSkillVersion | None:
-        return self._records.get((skill_id, version))
+    def get_skill(self, *, slug: str) -> StoredSkillIdentity | None:
+        versions = [
+            record for (stored_slug, _), record in self._records.items() if stored_slug == slug
+        ]
+        if not versions:
+            return None
+        current = max(versions, key=lambda item: (item.published_at, item.version))
+        return StoredSkillIdentity(
+            slug=slug,
+            status="published",
+            current_version=current.version,
+            current_version_published_at=current.published_at,
+            created_at=current.published_at,
+            updated_at=current.published_at,
+        )
 
-    def list_versions(self, skill_id: str) -> tuple[StoredSkillVersion, ...]:
+    def list_versions(self, *, slug: str) -> tuple[StoredSkillVersionSummary, ...]:
         return tuple(
-            record
-            for (stored_skill_id, _), record in self._records.items()
-            if stored_skill_id == skill_id
+            StoredSkillVersionSummary(
+                slug=record.slug,
+                version=record.version,
+                version_checksum_digest=record.version_checksum_digest,
+                content_checksum_digest=record.content_checksum_digest,
+                content_size_bytes=record.content_size_bytes,
+                rendered_summary=record.rendered_summary,
+                name=record.name,
+                description=record.description,
+                tags=record.tags,
+                published_at=record.published_at,
+            )
+            for (stored_slug, _), record in self._records.items()
+            if stored_slug == slug
         )
-
-
-class FakeArtifactStore:
-    """In-memory artifact store stub."""
-
-    def __init__(self) -> None:
-        self.artifacts: dict[str, bytes] = {}
-
-    def store_immutable_artifact(
-        self,
-        *,
-        skill_id: str,
-        version: str,
-        artifact_bytes: bytes,
-        manifest_json: dict[str, object],
-    ) -> ArtifactWriteResult:
-        relative_path = f"skills/{skill_id}/{version}/artifact.bin"
-        self.artifacts[relative_path] = artifact_bytes
-        return ArtifactWriteResult(relative_path=relative_path, size_bytes=len(artifact_bytes))
-
-    def read_artifact(self, relative_path: str) -> bytes:
-        return self.artifacts[relative_path]
 
 
 class FakeAuditRecorder:
@@ -97,93 +104,49 @@ class FakeAuditRecorder:
         self.events.append(event_type)
 
 
-def _manifest(skill_id: str, version: str) -> SkillManifestData:
-    return SkillManifestData(
-        schema_version="1.0",
-        skill_id=skill_id,
+def _command(slug: str, version: str) -> CreateSkillVersionCommand:
+    return CreateSkillVersionCommand(
+        slug=slug,
         version=version,
-        name="Python Lint",
-        description="Linting skill",
-        tags=("python", "lint"),
-        depends_on=(),
-        extends=(),
-        conflicts_with=(),
-        overlaps_with=(),
+        content=SkillContentInput(raw_markdown="# Python Lint\n"),
+        metadata=SkillMetadataInput(
+            name="Python Lint",
+            description="Linting skill",
+            tags=("python", "lint"),
+        ),
+        relationships=SkillRelationshipsInput(),
     )
 
 
 @pytest.mark.unit
 def test_publish_version_returns_checksum_and_records_audit() -> None:
     registry = FakeRegistry()
-    artifact_store = FakeArtifactStore()
     audit_recorder = FakeAuditRecorder()
-    service = SkillRegistryService(
-        registry=registry,
-        artifact_store=artifact_store,
-        audit_recorder=audit_recorder,
-    )
+    service = SkillRegistryService(registry=registry, audit_recorder=audit_recorder)
 
-    response = service.publish_version(
-        manifest=_manifest(skill_id="python.lint", version="1.0.0"),
-        artifact_bytes=b"hello world",
-    )
+    response = service.publish_version(command=_command(slug="python.lint", version="1.0.0"))
 
-    assert response.skill_id == "python.lint"
+    assert response.slug == "python.lint"
     assert response.version == "1.0.0"
-    assert response.artifact.relative_path == "skills/python.lint/1.0.0/artifact.bin"
-    assert response.checksum.algorithm == "sha256"
-    assert (
-        response.checksum.digest
-        == "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
-    )
+    assert response.version_checksum.algorithm == "sha256"
+    assert response.content.size_bytes == len(b"# Python Lint\n")
     assert "skill.version_published" in audit_recorder.events
 
 
 @pytest.mark.unit
 def test_publish_version_rejects_duplicates() -> None:
     registry = FakeRegistry()
-    artifact_store = FakeArtifactStore()
-    audit_recorder = FakeAuditRecorder()
-    service = SkillRegistryService(
-        registry=registry,
-        artifact_store=artifact_store,
-        audit_recorder=audit_recorder,
-    )
-    manifest = _manifest(skill_id="python.lint", version="1.0.0")
-    service.publish_version(manifest=manifest, artifact_bytes=b"v1")
+    service = SkillRegistryService(registry=registry, audit_recorder=FakeAuditRecorder())
+    command = _command(slug="python.lint", version="1.0.0")
+    service.publish_version(command=command)
 
     with pytest.raises(DuplicateSkillVersionError):
-        service.publish_version(manifest=manifest, artifact_bytes=b"v1")
+        service.publish_version(command=command)
 
 
 @pytest.mark.unit
-def test_get_version_raises_not_found_for_unknown_skill() -> None:
-    service = SkillRegistryService(
-        registry=FakeRegistry(),
-        artifact_store=FakeArtifactStore(),
-        audit_recorder=FakeAuditRecorder(),
-    )
+def test_get_skill_raises_not_found_for_unknown_slug() -> None:
+    service = SkillRegistryService(registry=FakeRegistry(), audit_recorder=FakeAuditRecorder())
 
-    with pytest.raises(SkillVersionNotFoundError):
-        service.get_version(skill_id="missing.skill", version="1.0.0")
-
-
-@pytest.mark.unit
-def test_get_version_detects_checksum_mismatch() -> None:
-    registry = FakeRegistry()
-    artifact_store = FakeArtifactStore()
-    audit_recorder = FakeAuditRecorder()
-    service = SkillRegistryService(
-        registry=registry,
-        artifact_store=artifact_store,
-        audit_recorder=audit_recorder,
-    )
-
-    published = service.publish_version(
-        manifest=_manifest(skill_id="python.lint", version="1.0.0"),
-        artifact_bytes=b"trusted payload",
-    )
-    artifact_store.artifacts[published.artifact.relative_path] = b"tampered payload"
-
-    with pytest.raises(IntegrityCheckFailedError):
-        service.get_version(skill_id="python.lint", version="1.0.0")
+    with pytest.raises(SkillNotFoundError):
+        service.get_skill(slug="missing.skill")

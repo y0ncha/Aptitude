@@ -1,5 +1,10 @@
 # Repo Rules
 
+## Critical Note
+- This codebase is not in production yet.
+- Prefer overwriting, deleting, and simplifying existing code over adding migrations, compatibility layers, or transitional glue.
+- It is acceptable to break anything except tests when doing cleanup or structural improvements.
+
 ## Architecture Boundaries
 - Interface layer validates requests and maps DTOs.
 - Core layer owns immutable catalog lifecycle, integrity checks, and policy decisions.
@@ -8,14 +13,14 @@
 - Audit layer records publish/read/governance/evaluation events.
 - Dependency direction is strict:
   - `interface -> core`
-  - `core -> intelligence` (when present)
-  - `core` depends on persistence only through core-defined ports/interfaces
+  - `core -> intelligence` when present
+  - `core` depends on persistence only through core-defined ports and interfaces
   - `persistence` implements core ports and may import core abstractions
 - Forbidden imports:
   - `app/interface/**` must not import `app/persistence/**`
   - `app/core/**` must not import `app/persistence/**`
 - Composition root exception:
-  - `app/main.py` may wire core services to persistence adapters.
+  - `app/main.py` may wire core services to persistence adapters
 
 ## Required Invariants
 - Immutable skill versions.
@@ -28,12 +33,24 @@
 - Use `kebab-case` for new filenames, rule identifiers, and plan slugs unless an external framework/tool requires a different format.
 
 ## Planning and Execution
-- Work on one milestone plan file at a time (`.agents/plans/plan-XX-*.md`).
+- Work on one milestone plan file at a time (`.agents/plans/XX-*.md`).
 - Do not start the next plan file before the current one meets its acceptance criteria.
 - Keep plan files append-only: do not renumber or rename completed plans.
 - Every implementation PR should map to exactly one active plan file.
-- When finishing work on a plan, review older changelogs and prior implementation
-  work for logic conflicts, redundant code, or obsolete code that can now be removed.
+- When finishing work on a plan, review older changelogs and prior implementation work for logic conflicts, redundancy, and code that should now be removed.
+
+## Large Change Workflow
+- Use this flow for large or cross-cutting changes, not only for net-new features.
+- Required order:
+  1. Review the current code before implementation to detect conflicts, redundancy, and reusable existing code.
+  2. Implement the change with the active milestone plan in mind. Prefer replacement and cleanup over additive compatibility work.
+  3. Run `make lint`.
+  4. Run `make typecheck`.
+  5. Run `make test`.
+  6. Update the active milestone documentation for the effort:
+     - append plan notes in the corresponding file under `.agents/plans/`
+     - write or update the matching milestone changelog using `$changelog-writer`
+- Do not skip steps 3-6 for a large change unless the environment blocks them; if blocked, record the reason in the changelog or plan note.
 
 ## TDD Workflow
 - Follow RED -> GREEN -> REFACTOR for non-trivial changes.

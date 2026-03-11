@@ -15,6 +15,8 @@ migrations.
 - `skill_version_checksum.py`: checksum metadata (`skill_version_checksums`).
 - `skill_relationship_edge.py`: typed relationship edges (`skill_relationship_edges`)
   with authored target version selectors for dependency/read-model projections.
+- `skill_search_document.py`: denormalized advisory search documents (`skill_search_documents`)
+  for compact candidate retrieval.
 - `audit_event.py`: audit event table (`audit_events`).
 - `__init__.py`: package exports.
 

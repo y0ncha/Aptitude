@@ -32,6 +32,7 @@ Deliver a production-ready, PyPI-like immutable registry service (`aptitude-serv
 8. `08-operability-and-release-readiness.md`
 9. `09-postgres-content-addressed-artifact-cache.md`
 10. `10-hybrid-artifact-storage-and-git-provenance.md`
+11. `11-discovery-resolution-fetch-service-split.md`
 
 ## PRD Phase Mapping
 - `MVP` (prd): milestones 01-04.

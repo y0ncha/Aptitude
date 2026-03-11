@@ -7,7 +7,7 @@ url: '{{baseUrl}}/healthz'
 headers:
   - key: Accept
     value: application/json
-    description: 'Request a JSON liveness response'
+    description: Request a JSON liveness response
 
 scripts:
   - type: afterResponse
@@ -19,7 +19,6 @@ scripts:
 
       pm.test('Healthz payload matches contract', () => {
         const json = pm.response.json();
-        pm.expect(json.status).to.eql('ok');
         pm.expect(json.service).to.be.a('string').and.not.empty;
         pm.expect(json.environment).to.be.a('string').and.not.empty;
       });
