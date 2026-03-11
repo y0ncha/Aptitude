@@ -39,6 +39,13 @@ from app.persistence.models.skill_relationship_selector import SkillRelationship
 from app.persistence.models.skill_search_document import SkillSearchDocument
 from app.persistence.models.skill_version import SkillVersion
 
+_RELATIONSHIP_EDGE_ORDER: dict[RelationshipEdgeType, int] = {
+    "depends_on": 0,
+    "extends": 1,
+    "conflicts_with": 2,
+    "overlaps_with": 3,
+}
+
 _SEARCH_CANDIDATES_SQL = text(
     """
     WITH filtered AS (
@@ -378,10 +385,7 @@ class SQLAlchemySkillRegistryRepository(
                     version=item.version,
                     relationships=tuple(
                         _to_stored_selector(selector)
-                        for selector in sorted(
-                            item.relationship_selectors,
-                            key=lambda row: (row.edge_type, row.ordinal),
-                        )
+                        for selector in _sort_relationship_selectors(item.relationship_selectors)
                     ),
                 )
                 for item in rows
@@ -544,10 +548,7 @@ def _to_stored_skill_version(entity: SkillVersion) -> StoredSkillVersion:
         published_at=entity.published_at,
         relationships=tuple(
             _to_stored_selector(selector)
-            for selector in sorted(
-                entity.relationship_selectors,
-                key=lambda row: (row.edge_type, row.ordinal),
-            )
+            for selector in _sort_relationship_selectors(entity.relationship_selectors)
         ),
     )
 
@@ -564,6 +565,15 @@ def _to_stored_skill_version_summary(entity: SkillVersion) -> StoredSkillVersion
         description=entity.metadata_row.description,
         tags=tuple(entity.metadata_row.tags),
         published_at=entity.published_at,
+    )
+
+
+def _sort_relationship_selectors(
+    selectors: list[SkillRelationshipSelector],
+) -> list[SkillRelationshipSelector]:
+    return sorted(
+        selectors,
+        key=lambda row: (_RELATIONSHIP_EDGE_ORDER[cast(RelationshipEdgeType, row.edge_type)], row.ordinal),
     )
 
 

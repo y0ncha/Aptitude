@@ -13,7 +13,11 @@ command = "make run"
 [[actions]]
 name = "Test"
 icon = "test"
-command = "make test"
+command = '''
+make db-up
+make migrate-up
+make test
+'''
 
 [[actions]]
 name = "Debug"

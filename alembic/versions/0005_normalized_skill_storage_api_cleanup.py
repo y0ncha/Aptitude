@@ -242,8 +242,15 @@ def upgrade() -> None:
     ).mappings()
 
     for row in version_rows:
+        skill_id = str(row["skill_id"])
+        version = str(row["version"])
         manifest = _ensure_manifest_dict(row["manifest_json"])
-        raw_markdown = _read_legacy_markdown(relative_path=str(row["artifact_rel_path"]))
+        raw_markdown = _read_legacy_markdown(
+            relative_path=str(row["artifact_rel_path"]),
+            manifest=manifest,
+            skill_id=skill_id,
+            version=version,
+        )
         content_checksum = hashlib.sha256(raw_markdown.encode("utf-8")).hexdigest()
         size_bytes = len(raw_markdown.encode("utf-8"))
         rendered_summary = None
@@ -334,9 +341,9 @@ def upgrade() -> None:
             {
                 "content_fk": content_id,
                 "metadata_fk": metadata_id,
-                "checksum_digest": str(row["checksum_digest"] or content_checksum),
+                "checksum_digest": content_checksum,
                 "artifact_size_bytes": size_bytes,
-                "artifact_rel_path": f"db://skills/{row['skill_id']}/{row['version']}/content.md",
+                "artifact_rel_path": f"db://skills/{skill_id}/{version}/content.md",
                 "skill_version_id": int(row["id"]),
             },
         )
@@ -393,7 +400,7 @@ def upgrade() -> None:
                         :constraint_type,
                         :version_constraint
                     )
-                    ON CONFLICT ON CONSTRAINT uq_skill_dependencies_exact_edge DO NOTHING
+                    ON CONFLICT (from_version_fk, to_version_fk, constraint_type) DO NOTHING
                     """
                 ),
                 {
@@ -491,16 +498,58 @@ def _artifact_root() -> Path:
     return Path(os.environ.get("ARTIFACT_ROOT_DIR", "./.data/artifacts")).resolve()
 
 
-def _read_legacy_markdown(*, relative_path: str) -> str:
+def _read_legacy_markdown(
+    *,
+    relative_path: str,
+    manifest: dict[str, Any],
+    skill_id: str,
+    version: str,
+) -> str:
     path = Path(relative_path)
     if not path.is_absolute():
         path = _artifact_root() / path
     try:
         return path.read_text(encoding="utf-8")
-    except FileNotFoundError as exc:
-        raise RuntimeError(f"Missing legacy artifact for migration: {path}") from exc
+    except FileNotFoundError:
+        return _build_missing_artifact_markdown(
+            manifest=manifest,
+            skill_id=skill_id,
+            version=version,
+            relative_path=relative_path,
+        )
     except UnicodeDecodeError as exc:
         raise RuntimeError(f"Legacy artifact is not valid UTF-8 markdown: {path}") from exc
+
+
+def _build_missing_artifact_markdown(
+    *,
+    manifest: dict[str, Any],
+    skill_id: str,
+    version: str,
+    relative_path: str,
+) -> str:
+    title = manifest.get("name") if isinstance(manifest.get("name"), str) else skill_id
+    description = (
+        manifest.get("description").strip()
+        if isinstance(manifest.get("description"), str) and manifest.get("description").strip()
+        else None
+    )
+    tags = _tags_from_manifest(manifest)
+
+    lines = [f"# {title}", ""]
+    if description is not None:
+        lines.extend([description, ""])
+    if tags:
+        lines.extend([f"Tags: {', '.join(tags)}", ""])
+    lines.extend(
+        [
+            "> Original markdown artifact was unavailable during migration.",
+            f"> Legacy artifact reference: `{relative_path}`.",
+            f"> Skill version: `{skill_id}@{version}`.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _ensure_manifest_dict(raw: object) -> dict[str, Any]:

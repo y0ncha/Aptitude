@@ -12,6 +12,7 @@
 ![mypy](https://img.shields.io/badge/mypy-2A6DB2?style=for-the-badge)
 ![Docker](https://img.shields.io/badge/docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude-server?style=for-the-badge)
+[![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-0A66C2?style=for-the-badge)](https://deepwiki.com/y0ncha/aptitude-server)
 
 `aptitude-server` is the registry service in the Aptitude ecosystem.
 It stores immutable skill artifacts and versioned metadata so clients can

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from app.persistence.models.skill_dependency import SkillDependency
     from app.persistence.models.skill_metadata import SkillMetadata
     from app.persistence.models.skill_relationship_selector import SkillRelationshipSelector
+    from app.persistence.models.skill_version_checksum import SkillVersionChecksum
 
 
 class SkillVersion(Base):
@@ -84,9 +85,16 @@ class SkillVersion(Base):
     artifact_rel_path: Mapped[str] = mapped_column(Text, nullable=False)
     artifact_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
-    skill: Mapped[Skill] = relationship(back_populates="versions")
+    skill: Mapped[Skill] = relationship(
+        back_populates="versions",
+        foreign_keys=[skill_fk],
+    )
     content: Mapped[SkillContent] = relationship()
     metadata_row: Mapped[SkillMetadata] = relationship()
+    checksum: Mapped[SkillVersionChecksum | None] = relationship(
+        back_populates="skill_version",
+        uselist=False,
+    )
     relationship_selectors: Mapped[list[SkillRelationshipSelector]] = relationship(
         cascade="all, delete-orphan",
         order_by="SkillRelationshipSelector.ordinal",
