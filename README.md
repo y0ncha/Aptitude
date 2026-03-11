@@ -1,10 +1,17 @@
 # aptitude-server
 
-![Python Version](https://img.shields.io/badge/python-3.12+-3776AB?logo=python)
-![License](https://img.shields.io/github/license/y0ncha/aptitude-server)
-![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude-server)
-![Issues](https://img.shields.io/github/issues/y0ncha/aptitude-server)
-![Status](https://img.shields.io/badge/status-active--development-blue)
+![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![uv](https://img.shields.io/badge/uv-managed-6E56CF?style=for-the-badge)
+![FastAPI](https://img.shields.io/badge/fastapi-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Pydantic](https://img.shields.io/badge/pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/sqlalchemy-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white)
+![Postgres](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+![Alembic](https://img.shields.io/badge/alembic-222222?style=for-the-badge)
+![pytest](https://img.shields.io/badge/pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![Ruff](https://img.shields.io/badge/ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=111111)
+![mypy](https://img.shields.io/badge/mypy-2A6DB2?style=for-the-badge)
+![Docker](https://img.shields.io/badge/docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude-server?style=for-the-badge)
 
 `aptitude-server` is the registry service in the Aptitude ecosystem.
 It stores immutable skill artifacts and versioned metadata so clients can

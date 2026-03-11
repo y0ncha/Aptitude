@@ -16,10 +16,10 @@ class SkillSearchDocument(Base):
 
     __tablename__ = "skill_search_documents"
     __table_args__ = (
-        Index("ix_skill_search_documents_normalized_skill_id", "normalized_skill_id"),
+        Index("ix_skill_search_documents_normalized_slug", "normalized_slug"),
         Index("ix_skill_search_documents_normalized_name", "normalized_name"),
         Index("ix_skill_search_documents_published_at", "published_at"),
-        Index("ix_skill_search_documents_artifact_size_bytes", "artifact_size_bytes"),
+        Index("ix_skill_search_documents_content_size_bytes", "content_size_bytes"),
         Index(
             "ix_skill_search_documents_normalized_tags_gin",
             "normalized_tags",
@@ -37,8 +37,8 @@ class SkillSearchDocument(Base):
         ForeignKey("skill_versions.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    skill_id: Mapped[str] = mapped_column(Text, nullable=False)
-    normalized_skill_id: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_slug: Mapped[str] = mapped_column(Text, nullable=False)
     version: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     normalized_name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -51,7 +51,7 @@ class SkillSearchDocument(Base):
         server_default=text("''::tsvector"),
     )
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    artifact_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    content_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
     usage_count: Mapped[int] = mapped_column(
         BigInteger,
         nullable=False,

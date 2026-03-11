@@ -8,50 +8,43 @@ import pytest
 
 from app.interface.dto.errors import ErrorEnvelope
 from app.interface.dto.examples import (
-    ARTIFACT_STORAGE_FAILURE_ERROR_EXAMPLE,
+    CONTENT_STORAGE_FAILURE_ERROR_EXAMPLE,
     DUPLICATE_SKILL_VERSION_ERROR_EXAMPLE,
-    EXACT_FETCH_SUCCESS_EXAMPLE,
-    FETCH_BATCH_SUCCESS_EXAMPLE,
-    FETCH_SUCCESS_EXAMPLE,
-    INTEGRITY_CHECK_FAILED_ERROR_EXAMPLE,
-    INVALID_MANIFEST_ERROR_EXAMPLE,
     INVALID_REQUEST_ERROR_EXAMPLE,
     LIST_SUCCESS_EXAMPLE,
-    PUBLISH_MANIFEST_EXAMPLE,
-    PUBLISH_SUCCESS_EXAMPLE,
+    PUBLISH_REQUEST_EXAMPLE,
     RELATIONSHIP_BATCH_SUCCESS_EXAMPLE,
     SEARCH_INVALID_REQUEST_ERROR_EXAMPLE,
     SEARCH_SUCCESS_EXAMPLE,
+    SKILL_IDENTITY_SUCCESS_EXAMPLE,
+    SKILL_NOT_FOUND_ERROR_EXAMPLE,
     SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
+    SKILL_VERSION_RESPONSE_EXAMPLE,
 )
 from app.interface.dto.skills import (
-    ExactSkillVersionResponse,
-    SkillFetchBatchResponse,
-    SkillManifest,
+    SkillIdentityResponse,
     SkillRelationshipBatchResponse,
     SkillSearchResponse,
-    SkillVersionDetailResponse,
-    SkillVersionFetchResponse,
+    SkillVersionCreateRequest,
     SkillVersionListResponse,
+    SkillVersionResponse,
 )
 
 
 @pytest.mark.unit
-def test_publish_manifest_example_matches_request_contract() -> None:
-    manifest = SkillManifest.model_validate(PUBLISH_MANIFEST_EXAMPLE)
+def test_publish_request_example_matches_request_contract() -> None:
+    request = SkillVersionCreateRequest.model_validate(PUBLISH_REQUEST_EXAMPLE)
 
-    assert manifest.skill_id == "python.lint"
-    assert manifest.depends_on is not None
+    assert request.slug == "python.lint"
+    assert request.relationships.depends_on
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("payload", "model"),
     [
-        (PUBLISH_SUCCESS_EXAMPLE, SkillVersionDetailResponse),
-        (FETCH_SUCCESS_EXAMPLE, SkillVersionFetchResponse),
-        (EXACT_FETCH_SUCCESS_EXAMPLE, ExactSkillVersionResponse),
-        (FETCH_BATCH_SUCCESS_EXAMPLE, SkillFetchBatchResponse),
+        (SKILL_VERSION_RESPONSE_EXAMPLE, SkillVersionResponse),
+        (SKILL_IDENTITY_SUCCESS_EXAMPLE, SkillIdentityResponse),
         (LIST_SUCCESS_EXAMPLE, SkillVersionListResponse),
         (SEARCH_SUCCESS_EXAMPLE, SkillSearchResponse),
         (RELATIONSHIP_BATCH_SUCCESS_EXAMPLE, SkillRelationshipBatchResponse),
@@ -71,11 +64,10 @@ def test_success_examples_match_response_contracts(
     "payload",
     [
         INVALID_REQUEST_ERROR_EXAMPLE,
-        INVALID_MANIFEST_ERROR_EXAMPLE,
         DUPLICATE_SKILL_VERSION_ERROR_EXAMPLE,
+        SKILL_NOT_FOUND_ERROR_EXAMPLE,
         SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
-        INTEGRITY_CHECK_FAILED_ERROR_EXAMPLE,
-        ARTIFACT_STORAGE_FAILURE_ERROR_EXAMPLE,
+        CONTENT_STORAGE_FAILURE_ERROR_EXAMPLE,
         SEARCH_INVALID_REQUEST_ERROR_EXAMPLE,
     ],
 )

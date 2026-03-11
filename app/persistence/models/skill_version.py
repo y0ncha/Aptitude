@@ -1,11 +1,21 @@
-"""Immutable skill version model."""
+"""Normalized immutable skill version model."""
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Text, UniqueConstraint, func
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,11 +23,14 @@ from app.persistence.models.base import Base
 
 if TYPE_CHECKING:
     from app.persistence.models.skill import Skill
-    from app.persistence.models.skill_version_checksum import SkillVersionChecksum
+    from app.persistence.models.skill_content import SkillContent
+    from app.persistence.models.skill_dependency import SkillDependency
+    from app.persistence.models.skill_metadata import SkillMetadata
+    from app.persistence.models.skill_relationship_selector import SkillRelationshipSelector
 
 
 class SkillVersion(Base):
-    """Represents immutable `skill@version` metadata."""
+    """Represents one immutable published version bound to normalized content and metadata."""
 
     __tablename__ = "skill_versions"
     __table_args__ = (
@@ -39,18 +52,48 @@ class SkillVersion(Base):
         index=True,
     )
     version: Mapped[str] = mapped_column(Text, nullable=False)
-    manifest_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    artifact_rel_path: Mapped[str] = mapped_column(Text, nullable=False)
-    artifact_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    content_fk: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("skill_contents.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    metadata_fk: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("skill_metadata.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    checksum_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
     published_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
+    is_published: Mapped[bool] = mapped_column(
+        nullable=False,
+        server_default=text("true"),
+    )
+    # Legacy compatibility mirror retained for reversible migration safety.
+    manifest_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    artifact_rel_path: Mapped[str] = mapped_column(Text, nullable=False)
+    artifact_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     skill: Mapped[Skill] = relationship(back_populates="versions")
-    checksum: Mapped[SkillVersionChecksum] = relationship(
-        back_populates="skill_version",
-        uselist=False,
+    content: Mapped[SkillContent] = relationship()
+    metadata_row: Mapped[SkillMetadata] = relationship()
+    relationship_selectors: Mapped[list[SkillRelationshipSelector]] = relationship(
         cascade="all, delete-orphan",
+        order_by="SkillRelationshipSelector.ordinal",
+        back_populates="skill_version",
+    )
+    dependencies_from: Mapped[list[SkillDependency]] = relationship(
+        cascade="all, delete-orphan",
+        foreign_keys="SkillDependency.from_version_fk",
+        back_populates="source_version",
     )

@@ -29,14 +29,14 @@ class SkillSearchQuery:
 class SkillSearchResult:
     """Compact advisory search card returned to the API layer."""
 
-    skill_id: str
+    slug: str
     version: str
     name: str
     description: str | None
     tags: tuple[str, ...]
     published_at: datetime
     freshness_days: int
-    footprint_bytes: int
+    content_size_bytes: int
     usage_count: int
     matched_fields: tuple[str, ...]
     matched_tags: tuple[str, ...]
@@ -61,26 +61,26 @@ class SkillSearchService:
             limit=query.limit,
         )
         stored_results = self._search_port.search_candidates(
-            request=SearchCandidatesRequest(
-                query_text=normalized_request.query_text,
-                required_tags=normalized_request.effective_tags,
-                fresh_within_days=normalized_request.fresh_within_days,
-                max_footprint_bytes=normalized_request.max_footprint_bytes,
-                limit=normalized_request.limit,
+                request=SearchCandidatesRequest(
+                    query_text=normalized_request.query_text,
+                    required_tags=normalized_request.effective_tags,
+                    fresh_within_days=normalized_request.fresh_within_days,
+                    max_content_size_bytes=normalized_request.max_footprint_bytes,
+                    limit=normalized_request.limit,
+                )
             )
-        )
         current_time = datetime.now(UTC)
 
         results = tuple(
             SkillSearchResult(
-                skill_id=item.skill_id,
+                slug=item.slug,
                 version=item.version,
                 name=item.name,
                 description=item.description,
                 tags=item.tags,
                 published_at=item.published_at,
                 freshness_days=max((current_time - item.published_at).days, 0),
-                footprint_bytes=item.artifact_size_bytes,
+                content_size_bytes=item.content_size_bytes,
                 usage_count=item.usage_count,
                 matched_fields=explanation.matched_fields,
                 matched_tags=explanation.matched_tags,
@@ -91,11 +91,11 @@ class SkillSearchService:
                 build_search_explanation(
                     query_terms=normalized_request.query_terms,
                     requested_tags=normalized_request.effective_tags,
-                    skill_id=item.skill_id,
+                    slug=item.slug,
                     name=item.name,
                     description=item.description,
                     tags=item.tags,
-                    exact_skill_id_match=item.exact_skill_id_match,
+                    exact_slug_match=item.exact_slug_match,
                     exact_name_match=item.exact_name_match,
                     lexical_score=item.lexical_score,
                     tag_overlap_count=item.tag_overlap_count,

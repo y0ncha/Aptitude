@@ -64,7 +64,7 @@ flowchart TB
 Client["Client / MCP / CLI"]
 Resolver["aptitude-resolver\n- Prompt Interpreter\n- Query Builder\n- Reranker + Selector\n- Dependency Solver\n- Lock Builder\n- Plugin Orchestrator"]
 Registry["aptitude-server\n- Publish/Fetch/List APIs\n- Search Candidate Retrieval\n- Governance + Metadata"]
-Storage["Persistence\n- Artifact Store\n- PostgreSQL Indexes\n- Audit Log"]
+Storage["Persistence\n- PostgreSQL Artifact Payloads\n- PostgreSQL Indexes\n- Audit Log"]
 
 Client --> Resolver
 Resolver --> Registry
@@ -107,8 +107,8 @@ Server is responsible for registry correctness and governance.
 
 Persistence ensures durability and integrity.
 
-- Artifact store for immutable skill payloads.
-- PostgreSQL indexes for metadata and lifecycle/read models.
+- PostgreSQL split tables for immutable skill payloads and version metadata.
+- PostgreSQL indexes for discovery, lifecycle, and read models.
 - Audit records for publish/deprecate/archive/read operations.
 
 ### Observability and Audit
@@ -266,7 +266,7 @@ Goal: each step ends with a complete, testable vertical slice.
 
 - FastAPI + Pydantic v2 + OpenAPI.
 - PostgreSQL + SQLAlchemy 2.0 + Alembic.
-- PostgreSQL-backed artifact mapping (digest keyed) and object storage (future).
+- PostgreSQL split-table artifact storage with digest-keyed deduplication.
 
 ### Resolver
 

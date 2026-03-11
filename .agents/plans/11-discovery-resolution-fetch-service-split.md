@@ -7,20 +7,20 @@ Make the read side of `aptitude-server` explicit and future-proof by separating 
 - API framework: FastAPI with OpenAPI-first contracts
 - Runtime: Python 3.12+
 - Data layer: PostgreSQL metadata/read models via SQLAlchemy 2.0
-- Artifact backend: filesystem today, compatible with later hybrid/object-backed fetch adapters
+- Artifact backend: PostgreSQL split tables for metadata and digest-addressed payload rows
 
 ## Scope
 - Introduce explicit `discovery`, `resolution`, and `fetch` routers and core services.
 - Keep discovery advisory and data-local, consistent with plan `05-metadata-search-ranking.md`.
 - Add direct relationship read APIs for authored `depends_on` and `extends` edges only; no transitive traversal or solver behavior.
-- Add exact metadata fetch and artifact streaming APIs with ordered batch reads and backend-agnostic artifact references.
+- Add exact metadata fetch and artifact streaming APIs with ordered batch reads and PostgreSQL-backed payload retrieval.
 - Preserve legacy combined search/fetch routes as deprecated compatibility facades during transition.
-- Keep the fetch contract aligned with the storage abstraction direction in `10-hybrid-artifact-storage-and-git-provenance.md`.
+- Keep the fetch contract aligned with the split-table PostgreSQL direction in `10-hybrid-artifact-storage-and-git-provenance.md`.
 
 ## Architecture Impact
 - Hardens the server/client boundary by making discovery, relationship lookup, and exact fetch separate public capabilities.
 - Prevents relationship reads from drifting into server-side solving.
-- Decouples PostgreSQL metadata reads from artifact byte access, which reduces conflict with hybrid persistence work.
+- Separates discovery and exact fetch query paths while keeping one transactional persistence system.
 
 ## Deliverables
 - New routers:
@@ -30,7 +30,7 @@ Make the read side of `aptitude-server` explicit and future-proof by separating 
   - `GET /fetch/skills/{skill_id}/{version}`
   - `GET /fetch/skills/{skill_id}/{version}/artifact`
 - New core services and read ports for discovery, direct relationship lookup, and exact fetch.
-- Backend-agnostic fetch DTOs with artifact references instead of storage-relative paths as the primary contract.
+- Fetch DTOs with immutable artifact identity fields instead of storage-relative paths as the primary contract.
 - Deprecated legacy route docs for `GET /skills/search` and `GET /skills/{skill_id}/{version}`.
 
 ## Acceptance Criteria
@@ -50,3 +50,11 @@ Make the read side of `aptitude-server` explicit and future-proof by separating 
   - direct relationship reads and authored ordering
   - discovery parity between legacy and new routes
 - Regression tests for legacy compatibility routes.
+
+## Follow-up Notes
+- March 10, 2026: typing hardening work for the split read-side surfaces is part of this milestone, not a separate plan.
+- The follow-up keeps discovery parity and relationship/fetch behavior unchanged while tightening internal contracts:
+  - shared conversion from `StoredSkillVersionSummary` to `SkillVersionSummary`
+  - literal edge typing for direct relationship reads
+  - non-optional FastAPI dependency signatures for discovery compatibility routes
+- Verification for this follow-up must follow the large-change workflow in `.agents/rules/repo.md`: review current code first, then run `make lint`, `make typecheck`, `make test`, and update milestone documentation.

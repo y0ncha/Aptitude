@@ -34,17 +34,17 @@ def test_build_search_explanation_tracks_text_and_tag_matches() -> None:
     explanation = build_search_explanation(
         query_terms=("python", "lint"),
         requested_tags=("python",),
-        skill_id="python.lint",
+        slug="python.lint",
         name="Python Lint",
         description="Linting skill for Python codebases",
         tags=("python", "lint"),
-        exact_skill_id_match=False,
+        exact_slug_match=False,
         exact_name_match=False,
         lexical_score=0.42,
         tag_overlap_count=1,
     )
 
-    assert explanation.matched_fields == ("skill_id", "name", "description", "tags")
+    assert explanation.matched_fields == ("slug", "name", "description", "tags")
     assert explanation.matched_tags == ("python",)
     assert explanation.reasons == ("text_match", "tag_filter_match")
 

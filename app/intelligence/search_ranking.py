@@ -53,9 +53,7 @@ def normalize_tag_list(values: Iterable[str] | None) -> tuple[str, ...]:
         return ()
 
     normalized_values = {
-        normalized
-        for value in values
-        if (normalized := normalize_tag(value)) is not None
+        normalized for value in values if (normalized := normalize_tag(value)) is not None
     }
     return tuple(sorted(normalized_values))
 
@@ -102,24 +100,24 @@ def build_search_explanation(
     *,
     query_terms: tuple[str, ...],
     requested_tags: tuple[str, ...],
-    skill_id: str,
+    slug: str,
     name: str,
     description: str | None,
     tags: tuple[str, ...],
-    exact_skill_id_match: bool,
+    exact_slug_match: bool,
     exact_name_match: bool,
     lexical_score: float,
     tag_overlap_count: int,
 ) -> SearchExplanation:
     """Build stable explanation fields from ranking inputs."""
-    normalized_skill_id = normalize_search_text(skill_id) or ""
+    normalized_slug = normalize_search_text(slug) or ""
     normalized_name = normalize_search_text(name) or ""
     normalized_description = normalize_search_text(description) or ""
     normalized_tags = normalize_tag_list(tags)
 
     matched_fields: list[str] = []
-    if exact_skill_id_match or any(term in normalized_skill_id for term in query_terms):
-        matched_fields.append("skill_id")
+    if exact_slug_match or any(term in normalized_slug for term in query_terms):
+        matched_fields.append("slug")
     if exact_name_match or any(term in normalized_name for term in query_terms):
         matched_fields.append("name")
     if normalized_description and any(term in normalized_description for term in query_terms):
@@ -132,8 +130,8 @@ def build_search_explanation(
         matched_fields.append("tags")
 
     reasons: list[str] = []
-    if exact_skill_id_match:
-        reasons.append("exact_skill_id_match")
+    if exact_slug_match:
+        reasons.append("exact_slug_match")
     if exact_name_match:
         reasons.append("exact_name_match")
     if lexical_score > 0:

@@ -26,7 +26,6 @@ from app.interface.api.fetch import router as fetch_router
 from app.interface.api.health import router as health_router
 from app.interface.api.resolution import router as resolution_router
 from app.interface.api.skills import router as skills_router
-from app.persistence.artifact_store import FileSystemArtifactStore
 from app.persistence.db import (
     SQLAlchemyDatabaseReadinessProbe,
     dispose_engine,
@@ -72,10 +71,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     session_factory = get_session_factory()
     registry_repository = SQLAlchemySkillRegistryRepository(session_factory=session_factory)
     audit_recorder = SQLAlchemyAuditRecorder(session_factory=session_factory)
-    artifact_store = FileSystemArtifactStore(root_dir=settings.artifact_root_dir)
     app.state.skill_registry_service = SkillRegistryService(
         registry=registry_repository,
-        artifact_store=artifact_store,
         audit_recorder=audit_recorder,
     )
     app.state.skill_discovery_service = SkillDiscoveryService(
@@ -84,7 +81,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.skill_fetch_service = SkillFetchService(
         version_reader=registry_repository,
-        artifact_reader=artifact_store,
     )
     app.state.skill_relationship_service = SkillRelationshipService(
         relationship_reader=registry_repository,

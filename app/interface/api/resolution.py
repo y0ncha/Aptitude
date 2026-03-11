@@ -9,21 +9,19 @@ from fastapi import APIRouter, status
 from app.core.dependencies import SkillRelationshipServiceDep
 from app.core.ports import ExactSkillCoordinate
 from app.core.skill_relationships import SkillRelationshipBatchItem
-from app.interface.api.skill_api_support import (
-    relationship_selector_response,
-    to_related_skill_version_summary,
-)
+from app.interface.api.skill_api_support import to_related_version_response
 from app.interface.dto.errors import ErrorEnvelope
 from app.interface.dto.examples import (
     INVALID_REQUEST_ERROR_EXAMPLE,
     RELATIONSHIP_BATCH_SUCCESS_EXAMPLE,
 )
 from app.interface.dto.skills import (
-    ExactSkillCoordinateRequest,
+    RelationshipSelectorResponse,
     SkillRelationshipBatchItemResponse,
     SkillRelationshipBatchRequest,
     SkillRelationshipBatchResponse,
     SkillRelationshipEdgeResponse,
+    SkillVersionCoordinateRequest,
 )
 
 router = APIRouter(tags=["resolution"])
@@ -63,7 +61,7 @@ def batch_get_relationships(
     """Return direct authored relationships in request order."""
     results = relationship_service.get_direct_relationships(
         coordinates=tuple(
-            ExactSkillCoordinate(skill_id=item.skill_id, version=item.version)
+            ExactSkillCoordinate(slug=item.slug, version=item.version)
             for item in request.coordinates
         ),
         edge_types=tuple(request.edge_types),
@@ -79,8 +77,8 @@ def _to_relationship_batch_item_response(
     if item.relationships is None:
         return SkillRelationshipBatchItemResponse(
             status="not_found",
-            coordinate=ExactSkillCoordinateRequest(
-                skill_id=item.coordinate.skill_id,
+            coordinate=SkillVersionCoordinateRequest(
+                slug=item.coordinate.slug,
                 version=item.coordinate.version,
             ),
             relationships=None,
@@ -88,27 +86,26 @@ def _to_relationship_batch_item_response(
 
     return SkillRelationshipBatchItemResponse(
         status="found",
-        coordinate=ExactSkillCoordinateRequest(
-            skill_id=item.coordinate.skill_id,
+        coordinate=SkillVersionCoordinateRequest(
+            slug=item.coordinate.slug,
             version=item.coordinate.version,
         ),
         relationships=[
             SkillRelationshipEdgeResponse(
                 edge_type=relationship.edge_type,
-                selector=relationship_selector_response(
-                    skill_id=relationship.selector.skill_id,
+                selector=RelationshipSelectorResponse(
+                    slug=relationship.selector.slug,
                     version=relationship.selector.version,
                     version_constraint=relationship.selector.version_constraint,
                     optional=relationship.selector.optional,
-                    markers=relationship.selector.markers,
+                    markers=list(relationship.selector.markers),
                 ),
                 target_version=(
                     None
                     if relationship.target_version is None
-                    else to_related_skill_version_summary(stored=relationship.target_version)
+                    else to_related_version_response(relationship.target_version)
                 ),
             )
             for relationship in item.relationships
         ],
     )
-

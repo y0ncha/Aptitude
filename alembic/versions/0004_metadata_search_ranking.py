@@ -116,7 +116,11 @@ def upgrade() -> None:
     op.execute(
         """
         CREATE TRIGGER trg_skill_search_documents_vector
-        BEFORE INSERT OR UPDATE OF normalized_skill_id, normalized_name, normalized_tags, description
+        BEFORE INSERT OR UPDATE OF
+            normalized_skill_id,
+            normalized_name,
+            normalized_tags,
+            description
         ON skill_search_documents
         FOR EACH ROW
         EXECUTE FUNCTION update_skill_search_documents_vector()

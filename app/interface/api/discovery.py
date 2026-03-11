@@ -58,6 +58,7 @@ SEARCH_RESPONSES: OpenAPIResponses = {
     responses=SEARCH_RESPONSES,
 )
 def search_skills(
+    discovery_service: SkillDiscoveryServiceDep,
     q: Annotated[str | None, Query(description="Full-text discovery query.")] = None,
     tag: Annotated[
         list[str] | None,
@@ -71,15 +72,14 @@ def search_skills(
         int | None,
         Query(ge=0, description="Maximum age in days since publication."),
     ] = None,
-    max_footprint_bytes: Annotated[
+    max_content_size_bytes: Annotated[
         int | None,
-        Query(ge=0, description="Maximum allowed artifact size in bytes."),
+        Query(ge=0, description="Maximum allowed markdown size in bytes."),
     ] = None,
     limit: Annotated[
         int,
         Query(ge=1, le=50, description="Maximum number of skill candidates to return."),
     ] = 20,
-    discovery_service: SkillDiscoveryServiceDep = None,
 ) -> SkillSearchResponse | JSONResponse:
     """Search indexed metadata and return compact advisory candidates."""
     try:
@@ -88,7 +88,7 @@ def search_skills(
             tags=tag or [],
             language=language,
             fresh_within_days=fresh_within_days,
-            max_footprint_bytes=max_footprint_bytes,
+            max_content_size_bytes=max_content_size_bytes,
             limit=limit,
         )
     except ValidationError as exc:
@@ -105,9 +105,8 @@ def search_skills(
             tags=tuple(request.tags),
             language=request.language,
             fresh_within_days=request.fresh_within_days,
-            max_footprint_bytes=request.max_footprint_bytes,
+            max_footprint_bytes=request.max_content_size_bytes,
             limit=request.limit,
         )
     )
     return SkillSearchResponse(results=[to_search_result_response(item) for item in results])
-

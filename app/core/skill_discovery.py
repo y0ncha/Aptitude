@@ -7,4 +7,3 @@ from app.core.skill_search import SkillSearchService
 
 class SkillDiscoveryService(SkillSearchService):
     """Named discovery service facade over the existing advisory search implementation."""
-

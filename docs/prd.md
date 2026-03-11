@@ -3,11 +3,11 @@
 ## 1. Executive Summary
 
 - **Problem Statement**: Platform teams need a governed registry for publishing, discovering, and retrieving skills, but the server becomes harder to scale and cache when it also owns prompt interpretation, dependency solving, or runtime planning. The registry must stay focused on fast data-local operations over immutable artifacts and searchable metadata.
-- **Proposed Solution**: Define `aptitude-server` as a package-registry-style service responsible only for publish, fetch, list, search, governance, and audit contracts. Keep PostgreSQL authoritative for registry metadata and digest mappings, keep immutable artifact payloads in filesystem or object storage, and treat Git only as optional authoring provenance rather than a runtime storage backend.
+- **Proposed Solution**: Define `aptitude-server` as a package-registry-style service responsible only for publish, fetch, list, search, governance, and audit contracts. Keep PostgreSQL authoritative for registry metadata, digest mappings, and immutable artifact payloads, using split tables for metadata and content, and treat Git only as optional authoring provenance rather than a runtime storage backend.
 - **Success Criteria**:
   - 100% of artifact and metadata writes happen through server APIs.
   - Immutable overwrite attempts for existing `(skill_id, version)` are rejected 100% of the time.
-  - Identical artifact content published under different versions is deduplicated by `sha256` digest mapping in PostgreSQL and reused from a single immutable blob object.
+  - Identical artifact content published under different versions is deduplicated by `sha256` digest mapping in PostgreSQL and reused from a single immutable artifact row.
   - `GET /skills/search` p95 <= 250 ms for top-20 candidate retrieval on a 10,000-skill catalog with indexed filters.
   - `GET /skills/{id}/{version}` p95 <= 150 ms for metadata and manifest reads on the same catalog assumption.
   - Immutable read APIs return stable `ETag` headers and matching `If-None-Match` requests return `304 Not Modified`.
@@ -38,7 +38,7 @@
   - Search results return stable ordering, deterministic tie-breaks, and explanation fields describing why a result matched.
   - `GET /skills/{id}` lists published versions and lifecycle state without exposing internal tables or derived storage details.
   - `GET /skills/{id}/{version}` returns immutable metadata, integrity fields, artifact reference data, and optional provenance metadata for the exact published version.
-  - Published versions map immutably to a single `sha256` digest, and identical payloads reuse existing digest-backed blob storage.
+  - Published versions map immutably to a single `sha256` digest, and identical payloads reuse existing digest-backed PostgreSQL artifact rows.
   - Exact fetch and search behavior do not depend on a live Git checkout.
   - Deprecation and archive state are enforced consistently in discovery visibility and exact-read policy.
 
@@ -61,10 +61,10 @@
 ## 4. Technical Specifications
 
 - **Architecture Overview**:
-  - `Publish API` -> `Validation + Governance` -> `Catalog Persistence + Blob Reference`
+  - `Publish API` -> `Validation + Governance` -> `Metadata Row + Artifact Row`
   - `Search API` -> `Metadata + Description Indexes` -> `Stable Candidate Response`
-  - `Exact Fetch API` -> `Immutable Version Record` -> `Digest-Addressed Artifact Reference`
-  - Aptitude Server is authoritative for published metadata, digest mappings, and lifecycle state. Artifact payloads live in immutable filesystem or object storage, and optional Git provenance is captured only as publish metadata. The server is not authoritative for runtime selection or dependency resolution outcomes.
+  - `Exact Fetch API` -> `Immutable Version Record` -> `Digest-Addressed Artifact Row`
+  - Aptitude Server is authoritative for published metadata, digest mappings, artifact payloads, and lifecycle state in PostgreSQL. Optional Git provenance is captured only as publish metadata. The server is not authoritative for runtime selection or dependency resolution outcomes.
 
 ```mermaid
 flowchart LR
@@ -78,14 +78,14 @@ flowchart LR
   Search --> Catalog
   Fetch --> Catalog
   Catalog --> DB["PostgreSQL"]
-  Artifacts --> Blob["Filesystem / Object Storage"]
+  Artifacts --> DB["PostgreSQL"]
   Validate --> Audit["Audit Log"]
 ```
 
 - **Integration Points**:
-  - Primary DB: PostgreSQL for skills, versions, manifests, digest mappings, lifecycle state, trust metadata, provenance metadata, and audit indexes.
+  - Primary DB: PostgreSQL for skills, versions, manifests, artifact payloads, digest mappings, lifecycle state, trust metadata, provenance metadata, and audit indexes.
   - Search/indexing: PostgreSQL full-text and structured indexes, with optional derived read models for query performance.
-  - Artifact persistence: digest-addressed immutable blobs stored on the local filesystem for MVP; S3/GCS object storage and CDN support remain later-phase backends.
+  - Artifact persistence: digest-addressed immutable payloads stored in PostgreSQL split tables, with discovery and fetch optimized through separate query paths.
   - Git integration: optional publish-time provenance source (`repo_url`, `commit_sha`, `tree_path`); Git is not a required runtime storage backend.
   - Auth: scoped service tokens for `publish`, `read`, and `admin` permissions.
   - External integrations: CI publishers, admin tooling, and consumer-facing SDK or CLI layers through public HTTP APIs only.
@@ -97,14 +97,13 @@ flowchart LR
 | Current (MVP baseline) | Python + FastAPI + OpenAPI | Registry API boundary for publish, fetch, list, discovery, and governance contracts. |
 | Current (MVP baseline) | Pydantic v2 | Request and response validation for registry contracts. |
 | Current (MVP baseline) | Uvicorn (dev), Gunicorn + Uvicorn workers (prod) | ASGI serving in development and production. |
-| Current (MVP baseline) | PostgreSQL | Canonical storage for versions, metadata, lifecycle state, digest mappings, and audit records. |
+| Current (MVP baseline) | PostgreSQL | Canonical storage for versions, metadata, artifact payloads, lifecycle state, digest mappings, and audit records. |
 | Current (MVP baseline) | SQLAlchemy 2.0 + Alembic + `psycopg` | Data access, schema migrations, and PostgreSQL driver stack. |
 | Current (MVP baseline) | PostgreSQL full-text and metadata indexes | Low-latency search over descriptions, tags, and structured fields. |
-| Current (MVP baseline) | Local filesystem artifact store | Immutable artifact payload persistence under digest-addressed or version-addressed paths outside PostgreSQL. |
+| Current (MVP baseline) | PostgreSQL split artifact tables | Immutable artifact payload persistence inside PostgreSQL with digest-addressed deduplication and separate discovery/fetch query paths. |
 | Current (MVP baseline) | Digest-addressed artifact mapping (`sha256`) | Immutable artifact identity, deduplication, and version-to-digest binding. |
 | Current (MVP baseline) | HTTP conditional caching (`ETag`, `If-None-Match`) | Immutable read-path cache validation and bandwidth reduction. |
 | Current (MVP baseline) | Structured logging (`logging`/`structlog`) | Auditable operational and lifecycle logs. |
-| Planned (v1.1+) | S3/GCS object storage + CDN (digest-keyed) | Scalable artifact persistence and low-latency distribution. |
 | Planned (v1.1+) | Prometheus instrumentation + OpenTelemetry (optional) | Metrics and tracing for SLO monitoring and diagnostics. |
 | Planned (future optional) | Git provenance ingestion or mirroring | Capture authoring traceability without making Git part of the fetch/search critical path. |
 | Planned (future optional) | Meilisearch | Advanced discovery capabilities beyond PostgreSQL-native indexing. |
@@ -120,13 +119,13 @@ flowchart LR
 ## 5. Risks & Roadmap
 
 - **Phased Rollout**:
-  - **MVP**: immutable artifact catalog, publish/fetch/list/search APIs, digest deduplication, filesystem-backed artifact storage, scoped auth, and minimal audit trail.
-  - **v1.1**: richer discovery filters, deprecate/archive governance controls, object storage backend option, optional Git provenance capture, and stronger search explanation fields.
-  - **v2.0**: signatures and attestations, multi-tenant governance policy packs, CDN-backed artifact delivery, and optional dedicated search engine support.
+  - **MVP**: immutable artifact catalog, publish/fetch/list/search APIs, digest deduplication in PostgreSQL, scoped auth, and minimal audit trail.
+  - **v1.1**: richer discovery filters, deprecate/archive governance controls, optional Git provenance capture, and stronger search explanation fields.
+  - **v2.0**: signatures and attestations, multi-tenant governance policy packs, and optional dedicated search engine support.
 
 - **Technical Risks**:
   - Search index drift from canonical metadata can return stale or inconsistent candidate sets.
-  - Blob-store references can drift from canonical DB mappings if publish and retention flows are not designed to be atomic and auditable.
+  - If artifact payloads grow materially beyond current assumptions, PostgreSQL storage, backup size, and replication traffic could become a bottleneck.
   - Weak tie-break rules can make search ordering unstable and harder to debug or cache.
   - Incorrect lifecycle enforcement can leak deprecated or restricted artifacts through discovery or fetch paths.
   - Git provenance can become an accidental second source of truth if publish and fetch semantics start depending on repository state.
@@ -137,7 +136,7 @@ flowchart LR
 - **Server Boundary**:
   - Public API surface is limited to publish, fetch, list, search, and governance operations.
   - Search is candidate generation over indexed registry data; the server does not interpret prompts or choose final results.
-  - Exact `(skill_id, version)` reads are immutable and content-addressed through PostgreSQL-backed digest mappings to blob storage.
+  - Exact `(skill_id, version)` reads are immutable and content-addressed through PostgreSQL-backed digest mappings to PostgreSQL artifact rows.
   - Git provenance is advisory metadata only and is never a required runtime dependency for publish, search, or exact fetch behavior.
   - Derived search indexes are allowed for performance, but canonical truth remains the published version record and digest mapping.
 
@@ -153,5 +152,5 @@ flowchart LR
 
 - MVP catalog scale is up to 10,000 skills with metadata and description search served from PostgreSQL indexes.
 - MVP authentication is service-token based; end-user interactive auth flows are out of scope.
-- Artifact storage remains on the local filesystem for MVP, with object storage deferred to a later phase.
+- Artifact payloads remain small enough that PostgreSQL-only split-table storage is operationally acceptable for MVP and near-term scale.
 - Git is an optional publish-time provenance source, not a runtime registry storage dependency.

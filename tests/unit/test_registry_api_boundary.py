@@ -11,13 +11,11 @@ _EXPECTED_PUBLIC_PATHS = {
     "/readyz",
     "/discovery/skills/search",
     "/resolution/relationships:batch",
-    "/fetch/skill-versions:batch",
-    "/fetch/skills/{skill_id}/{version}",
-    "/fetch/skills/{skill_id}/{version}/artifact",
-    "/skills/publish",
-    "/skills/search",
-    "/skills/{skill_id}/{version}",
-    "/skills/{skill_id}",
+    "/skill-versions",
+    "/skills/{slug}",
+    "/skills/{slug}/versions",
+    "/skills/{slug}/versions/{version}",
+    "/skills/{slug}/versions/{version}/content",
 }
 _FORBIDDEN_PATHS = (
     "/resolve",
