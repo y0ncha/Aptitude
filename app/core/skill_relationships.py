@@ -11,11 +11,8 @@ from app.core.ports import (
     SkillRelationshipReadPort,
     SkillVersionReadPort,
 )
-from app.core.skill_registry import (
-    SkillRelationship,
-    SkillRelationshipSelector,
-    SkillVersionReference,
-)
+from app.core.skill_models import SkillRelationship, SkillRelationshipSelector
+from app.core.skill_version_projections import to_skill_version_reference
 
 SUPPORTED_RELATIONSHIP_EDGE_TYPES: tuple[RelationshipEdgeType, ...] = (
     "depends_on",
@@ -100,16 +97,7 @@ class SkillRelationshipService:
             coordinates=tuple(exact_target_coordinates)
         )
         target_by_key = {
-            (item.slug, item.version): SkillVersionReference(
-                slug=item.slug,
-                version=item.version,
-                name=item.name,
-                description=item.description,
-                tags=item.tags,
-                lifecycle_status=item.lifecycle_status,
-                trust_tier=item.trust_tier,
-                published_at=item.published_at,
-            )
+            (item.slug, item.version): to_skill_version_reference(stored=item)
             for item in exact_target_summaries
             if self._governance_policy.is_visible_in_list(
                 caller=caller,

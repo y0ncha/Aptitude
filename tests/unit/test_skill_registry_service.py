@@ -74,11 +74,7 @@ class FakeRegistry:
         current = max(versions, key=lambda item: (item.published_at, item.version))
         return StoredSkillIdentity(
             slug=slug,
-            status="published",
             current_version=current.version,
-            current_version_published_at=current.published_at,
-            current_version_status=current.lifecycle_status,
-            current_version_trust_tier=current.trust_tier,
             created_at=current.published_at,
             updated_at=current.published_at,
         )

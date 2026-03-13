@@ -191,12 +191,12 @@ Goal: each step ends with a complete, testable vertical slice.
 
 - Add/validate `depends_on` declarations.
 - Expose metadata via stable versioned APIs.
-- Add compatibility fixtures for resolver consumers.
+- Add client integration fixtures for resolver consumers.
 
 **Tests**
 
 - Contract tests for manifest/metadata payloads.
-- Backward-compatibility tests on API schema versions.
+- OpenAPI contract parity tests for the canonical API surface.
 
 ### Step 3 - Client Resolver and Locking (MVP-2)
 

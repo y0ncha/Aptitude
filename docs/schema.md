@@ -12,8 +12,8 @@ It reflects the direction implied by the current plans:
 - identity, versioning, body, query metadata, and graph edges are modeled separately
 
 ## Current Review
-The live schema is now normalized around PostgreSQL-backed content, metadata,
-relationship selectors, dependencies, and governance state.
+The live schema is a single canonical PostgreSQL baseline around content,
+metadata, relationship selectors, dependencies, and governance state.
 
 - `skills` stores only the logical identity row plus the current default version pointer
 - `skill_versions` binds immutable content and metadata to a version-scoped lifecycle/trust policy state
@@ -111,8 +111,8 @@ Authoritative markdown body storage.
 | `id` | `bigint` | PK | Internal content key |
 | `raw_markdown` | `text` | `NOT NULL` | Canonical skill markdown body |
 | `rendered_summary` | `text` | nullable | Optional pre-rendered short summary |
-| `storage_size_bytes` | `bigint` | nullable | Observed body size for planning and diagnostics |
-| `checksum` | `text` | `NOT NULL`, unique | Content digest for deduplication and integrity |
+| `storage_size_bytes` | `bigint` | `NOT NULL` | Observed body size for planning and diagnostics |
+| `checksum_digest` | `text` | `NOT NULL`, unique | Content digest for deduplication and integrity |
 
 Storage notes:
 
@@ -152,16 +152,17 @@ Graph edges between immutable versions.
 
 | Column | Type | Constraints | Purpose |
 | --- | --- | --- | --- |
-| `from_version_id` | `bigint` | `NOT NULL`, FK -> `skill_versions.id` | Source version |
-| `to_version_id` | `bigint` | `NOT NULL`, FK -> `skill_versions.id` | Target version |
+| `id` | `bigint` | PK | Internal edge key |
+| `from_version_fk` | `bigint` | `NOT NULL`, FK -> `skill_versions.id` | Source version |
+| `to_version_fk` | `bigint` | `NOT NULL`, FK -> `skill_versions.id` | Target version |
 | `constraint_type` | `text` | `NOT NULL` | `depends_on`, `extends`, `conflicts_with`, `overlaps_with` |
-| `version_constraint` | `text` | nullable | Original authored selector text or compatibility note |
+| `version_constraint` | `text` | nullable | Original authored selector text |
 
 Recommended constraints and indexes:
 
-- composite PK or unique constraint on `(from_version_id, to_version_id, constraint_type)`
-- index on `from_version_id`
-- index on `to_version_id`
+- unique constraint on `(from_version_fk, to_version_fk, constraint_type)`
+- index on `from_version_fk`
+- index on `to_version_fk`
 - check constraint restricting `constraint_type` to the supported set
 
 Important note:
@@ -175,11 +176,9 @@ Derived read model for fast advisory search.
 This table is derived from `skills`, `skill_versions`, `skill_metadata`, and
 `skill_contents`.
 
-Suggested fields:
-
 | Column | Type | Purpose |
 | --- | --- | --- |
-| `skill_version_id` | `bigint` | PK and FK to `skill_versions.id` |
+| `skill_version_fk` | `bigint` | PK and FK to `skill_versions.id` |
 | `slug` | `text` | Normalized identifier for direct matching |
 | `normalized_slug` | `text` | Lowercased identifier for exact matching |
 | `version` | `text` | Candidate version |
@@ -223,19 +222,18 @@ Exact fetch path:
 
 - resolve `(slug, version)` through `skills` and `skill_versions`
 - load `skill_contents.raw_markdown`
-- verify checksum from `skill_versions.checksum` and/or `skill_contents.checksum`
+- return checksum metadata from `skill_versions.checksum_digest` and `skill_contents.checksum_digest`
 
 ## Migration Direction
-Milestone 06 completes the move to the normalized source model:
+The schema is rebaselined as one canonical Alembic migration:
 
-1. `skill_contents` and `skill_metadata` are canonical.
-2. `skill_relationship_selectors` preserves authored selectors.
-3. `skill_dependencies` stores exact resolved version edges.
-4. `skill_versions` carries version-scoped lifecycle, trust, and provenance.
-5. `skill_search_documents` stores lifecycle/trust for governance-aware discovery.
-6. Legacy compatibility mirrors such as `skill_versions.manifest_json`,
-   `artifact_rel_path`, `artifact_size_bytes`, `is_published`,
-   `skill_version_checksums`, and `skill_relationship_edges` are removed at head.
+1. `0001_initial_schema` creates the full normalized schema directly.
+2. `skill_contents` and `skill_metadata` are canonical.
+3. `skill_relationship_selectors` preserves authored selectors.
+4. `skill_dependencies` stores exact resolved version edges.
+5. `skill_versions` carries version-scoped lifecycle, trust, and provenance.
+6. `skill_search_documents` stores lifecycle/trust for governance-aware discovery.
+7. Historical upgrade-from-legacy paths are intentionally unsupported.
 
 ## Non-Goals
 - storing markdown in `jsonb`

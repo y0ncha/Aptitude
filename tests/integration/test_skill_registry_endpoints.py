@@ -14,12 +14,12 @@ from app.main import create_app
 
 
 @pytest.fixture
-def migrated_registry_database(require_integration_database: str) -> str:
+def migrated_registry_database(clean_integration_database: str) -> str:
     config = Config("alembic.ini")
     config.set_main_option("script_location", "alembic")
-    config.set_main_option("sqlalchemy.url", require_integration_database)
+    config.set_main_option("sqlalchemy.url", clean_integration_database)
     command.upgrade(config, "head")
-    return require_integration_database
+    return clean_integration_database
 
 
 def _headers(token: str) -> dict[str, str]:

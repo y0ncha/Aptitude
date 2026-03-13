@@ -1,38 +1,23 @@
-"""Normalized skill registry DTOs and validation constants."""
+"""Normalized skill registry DTOs."""
 
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SEMVER_CORE = (
-    r"(0|[1-9]\d*)\."
-    r"(0|[1-9]\d*)\."
-    r"(0|[1-9]\d*)"
-    r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
-    r"(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+from app.core.governance import LifecycleStatus, TrustTier
+from app.core.ports import RelationshipEdgeType
+from app.interface.validation import (
+    MARKER_PATTERN,
+    MAX_BATCH_ITEMS,
+    SEMVER_PATTERN,
+    SLUG_PATTERN,
+    VERSION_CONSTRAINT_PATTERN,
 )
-SEMVER_PATTERN = rf"^{SEMVER_CORE}$"
-SLUG_PATTERN = r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,127})$"
-VERSION_CONSTRAINT_PATTERN = re.compile(
-    rf"^\s*(?:==|=|!=|>=|<=|>|<)\s*{SEMVER_CORE}\s*"
-    rf"(?:,\s*(?:==|=|!=|>=|<=|>|<)\s*{SEMVER_CORE}\s*)*$"
-)
-MARKER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
-MAX_BATCH_ITEMS = 100
 
-RelationshipEdgeType = Literal[
-    "depends_on",
-    "extends",
-    "conflicts_with",
-    "overlaps_with",
-]
 BatchItemStatus = Literal["found", "not_found"]
-LifecycleStatus = Literal["published", "deprecated", "archived"]
-TrustTier = Literal["untrusted", "internal", "verified"]
 
 
 def _default_relationship_edge_types() -> list[RelationshipEdgeType]:

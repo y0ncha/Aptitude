@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Literal
 
 CallerScope = Literal["read", "publish", "admin"]
@@ -63,16 +62,6 @@ class PolicyProfile:
     discovery_read_statuses: tuple[LifecycleStatus, ...]
     discovery_admin_statuses: tuple[LifecycleStatus, ...]
     exact_read_statuses: tuple[LifecycleStatus, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class VersionGovernance:
-    """Governance state attached to one immutable version."""
-
-    lifecycle_status: LifecycleStatus
-    lifecycle_changed_at: datetime
-    trust_tier: TrustTier
-    provenance: ProvenanceMetadata | None
 
 
 class GovernanceError(RuntimeError):

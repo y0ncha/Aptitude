@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from threading import Lock
 
 from sqlalchemy import create_engine, text
@@ -47,18 +46,6 @@ def dispose_engine() -> None:
 
         _ENGINE = None
         _SESSION_FACTORY = None
-
-
-def get_session() -> Iterator[Session]:
-    """Yield a scoped database session for request handling."""
-    if _SESSION_FACTORY is None:
-        raise RuntimeError("Database engine is not initialized.")
-
-    session = _SESSION_FACTORY()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def get_session_factory() -> sessionmaker[Session]:

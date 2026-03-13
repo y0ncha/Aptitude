@@ -41,8 +41,6 @@ from app.interface.dto.examples import (
     SKILL_VERSION_STATUS_RESPONSE_EXAMPLE,
 )
 from app.interface.dto.skills import (
-    SEMVER_PATTERN,
-    SLUG_PATTERN,
     SkillIdentityResponse,
     SkillVersionCreateRequest,
     SkillVersionListResponse,
@@ -50,6 +48,7 @@ from app.interface.dto.skills import (
     SkillVersionStatusResponse,
     SkillVersionStatusUpdateRequest,
 )
+from app.interface.validation import SEMVER_PATTERN, SLUG_PATTERN
 
 router = APIRouter(tags=["skills"])
 

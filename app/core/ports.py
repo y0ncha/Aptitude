@@ -101,11 +101,7 @@ class StoredSkillIdentity:
     """Stored logical skill identity projection."""
 
     slug: str
-    status: LifecycleStatus
     current_version: str | None
-    current_version_published_at: datetime | None
-    current_version_status: LifecycleStatus | None
-    current_version_trust_tier: TrustTier | None
     created_at: datetime
     updated_at: datetime
 
@@ -166,7 +162,6 @@ class StoredSkillVersionContent:
     size_bytes: int
     lifecycle_status: LifecycleStatus
     trust_tier: TrustTier
-    published_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,7 +192,6 @@ class SearchCandidatesRequest:
 class StoredSkillSearchCandidate:
     """Persistence projection for one ranked search candidate."""
 
-    skill_version_fk: int
     slug: str
     version: str
     name: str

@@ -13,13 +13,13 @@
 ![Last Commit](https://img.shields.io/github/last-commit/y0ncha/aptitude-server?style=for-the-badge)
 
 `aptitude-server` is the registry service in the Aptitude ecosystem.
-It stores immutable skill artifacts and versioned metadata so clients can
-publish skills, fetch exact versions, and rely on registry-backed discovery
-instead of crawling the full catalog.
+It stores immutable skill markdown, structured metadata, and relationship
+selectors in PostgreSQL so clients can publish versions, fetch exact content,
+and rely on registry-backed discovery instead of crawling the full catalog.
 
 ## What This Service Owns
 
-- Immutable `skill_id@version` publication
+- Immutable `slug@version` publication
 - Exact version fetches with checksum-backed integrity validation
 - Version metadata and direct dependency declarations
 - Registry metadata that powers discovery APIs
@@ -45,7 +45,7 @@ the client behaves more like the package manager and runtime planner.
 User / Agent
   -> Client
   -> aptitude-server
-  -> PostgreSQL + artifact storage + audit log
+  -> PostgreSQL + audit log
 ```
 
 The server keeps immutable records and exposes stable registry APIs.
@@ -59,12 +59,13 @@ The current implementation is intentionally registry-first.
 Implemented now:
 
 - FastAPI service with health and readiness endpoints
-- Immutable publish API for skill manifest + artifact
-- Exact fetch by `skill_id` and `version`
+- Immutable publish API for normalized JSON payloads
+- Exact metadata and content fetch by `slug` and `version`
 - Version listing per skill
 - Indexed advisory search over metadata and descriptions
-- Checksum verification on artifact reads
-- PostgreSQL-backed metadata persistence and filesystem artifact storage
+- Direct relationship batch reads over authored selectors
+- Lifecycle governance and status transitions
+- PostgreSQL-backed content and metadata persistence
 - Direct dependency declaration validation and retrieval
 
 Planned next:
@@ -78,12 +79,16 @@ Available endpoints today:
 
 - `GET /healthz`
 - `GET /readyz`
-- `POST /skills/publish`
-- `GET /skills/search`
-- `GET /skills/{skill_id}/{version}`
-- `GET /skills/{skill_id}`
+- `GET /discovery/skills/search`
+- `POST /resolution/relationships:batch`
+- `POST /skill-versions`
+- `GET /skills/{slug}`
+- `GET /skills/{slug}/versions`
+- `GET /skills/{slug}/versions/{version}`
+- `GET /skills/{slug}/versions/{version}/content`
+- `PATCH /skills/{slug}/versions/{version}/status`
 
-`GET /skills/search` is a discovery API for candidate generation only. Prompt
+`GET /discovery/skills/search` is a discovery API for candidate generation only. Prompt
 interpretation, reranking, final selection, dependency solving, and execution
 planning remain client-owned responsibilities.
 
@@ -97,7 +102,7 @@ The pinned standalone OpenAPI contract for the current v1 surface is committed a
 - Python 3.12+
 - FastAPI + Pydantic v2
 - PostgreSQL + SQLAlchemy + Alembic
-- Filesystem artifact storage
+- PostgreSQL-backed content and search projections
 - Ruff, pytest, mypy
 
 ## Local Development
@@ -128,6 +133,7 @@ make migrate-up
 make run
 ```
 
+`make run` uses the FastAPI CLI with the committed `app.main:app` entrypoint.
 The app runs on `http://127.0.0.1:8000`.
 
 ### Useful commands

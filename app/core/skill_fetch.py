@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 from app.core.governance import CallerIdentity, GovernancePolicy
-from app.core.ports import ExactSkillCoordinate, SkillVersionReadPort
-from app.core.skill_registry import (
+from app.core.ports import SkillVersionReadPort
+from app.core.skill_models import (
     SHA256_ALGORITHM,
     SkillChecksum,
     SkillContentDocument,
     SkillVersionDetail,
     SkillVersionNotFoundError,
-    SkillVersionSummary,
-    to_skill_version_summary,
 )
+from app.core.skill_version_projections import to_skill_version_detail
 
 
 class SkillFetchService:
@@ -42,28 +41,7 @@ class SkillFetchService:
             caller=caller,
             lifecycle_status=stored.lifecycle_status,
         )
-        from app.core.skill_registry import _to_detail  # local import avoids export churn
-
-        return _to_detail(stored=stored)
-
-    def get_version_metadata_batch(
-        self,
-        *,
-        caller: CallerIdentity,
-        coordinates: tuple[ExactSkillCoordinate, ...],
-    ) -> tuple[SkillVersionSummary, ...]:
-        """Return ordered exact metadata summaries for the requested coordinates."""
-        stored_versions = self._version_reader.get_version_summaries_batch(coordinates=coordinates)
-        by_key = {(item.slug, item.version): item for item in stored_versions}
-        return tuple(
-            to_skill_version_summary(stored=by_key[(coordinate.slug, coordinate.version)])
-            for coordinate in coordinates
-            if (coordinate.slug, coordinate.version) in by_key
-            and self._governance_policy.is_visible_in_list(
-                caller=caller,
-                lifecycle_status=by_key[(coordinate.slug, coordinate.version)].lifecycle_status,
-            )
-        )
+        return to_skill_version_detail(stored=stored)
 
     def get_content(
         self,
@@ -88,5 +66,4 @@ class SkillFetchService:
                 digest=stored.checksum_digest,
             ),
             size_bytes=stored.size_bytes,
-            published_at=stored.published_at,
         )

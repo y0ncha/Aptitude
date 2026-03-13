@@ -11,10 +11,10 @@ dependencies = [
     "sqlalchemy>=2.0.44",
     "uvicorn[standard]>=0.41.0",
     "pydantic>=2.12.5",
-    "ruff==0.15.5",
+    "ruff==0.15.6",
     "pytest>=9.0.2",
     "starlette>=0.52.1",
-    "fastapi-cloud-cli==0.14.1",
+    "fastapi-cloud-cli==0.15.0",
 ]
 
 [project.optional-dependencies]

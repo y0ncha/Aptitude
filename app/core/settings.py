@@ -7,7 +7,14 @@ from functools import lru_cache
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.core.governance import CallerScope, LifecycleStatus, PolicyProfile, PublishRule, TrustTier
+from app.core.governance import (
+    CallerScope,
+    LifecycleStatus,
+    PolicyProfile,
+    PublishRule,
+    TrustTier,
+    build_default_policy_profile,
+)
 
 
 class PublishRuleSettings(BaseModel):
@@ -18,19 +25,18 @@ class PublishRuleSettings(BaseModel):
 
 
 def _default_publish_rules() -> dict[TrustTier, PublishRuleSettings]:
+    default_policy = build_default_policy_profile()
     return {
-        "untrusted": PublishRuleSettings(required_scope="publish"),
-        "internal": PublishRuleSettings(required_scope="publish", provenance_required=True),
-        "verified": PublishRuleSettings(required_scope="admin", provenance_required=True),
+        tier: PublishRuleSettings(
+            required_scope=rule.required_scope,
+            provenance_required=rule.provenance_required,
+        )
+        for tier, rule in default_policy.publish_rules.items()
     }
 
 
 def _default_lifecycle_transitions() -> dict[LifecycleStatus, tuple[LifecycleStatus, ...]]:
-    return {
-        "published": ("deprecated", "archived"),
-        "deprecated": ("published", "archived"),
-        "archived": (),
-    }
+    return dict(build_default_policy_profile().lifecycle_transitions)
 
 
 class PolicyProfileSettings(BaseModel):
@@ -42,14 +48,18 @@ class PolicyProfileSettings(BaseModel):
     lifecycle_transitions: dict[LifecycleStatus, tuple[LifecycleStatus, ...]] = Field(
         default_factory=_default_lifecycle_transitions
     )
-    discovery_default_statuses: tuple[LifecycleStatus, ...] = ("published",)
-    discovery_read_statuses: tuple[LifecycleStatus, ...] = ("published", "deprecated")
-    discovery_admin_statuses: tuple[LifecycleStatus, ...] = (
-        "published",
-        "deprecated",
-        "archived",
+    discovery_default_statuses: tuple[LifecycleStatus, ...] = (
+        build_default_policy_profile().discovery_default_statuses
     )
-    exact_read_statuses: tuple[LifecycleStatus, ...] = ("published", "deprecated")
+    discovery_read_statuses: tuple[LifecycleStatus, ...] = (
+        build_default_policy_profile().discovery_read_statuses
+    )
+    discovery_admin_statuses: tuple[LifecycleStatus, ...] = (
+        build_default_policy_profile().discovery_admin_statuses
+    )
+    exact_read_statuses: tuple[LifecycleStatus, ...] = (
+        build_default_policy_profile().exact_read_statuses
+    )
 
 
 class Settings(BaseSettings):
@@ -59,7 +69,6 @@ class Settings(BaseSettings):
     app_env: str = Field(default="dev", alias="APP_ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     app_name: str = Field(default="aptitude-server", alias="APP_NAME")
-    artifact_root_dir: str = Field(default="./.data/artifacts", alias="ARTIFACT_ROOT_DIR")
     auth_tokens: dict[str, tuple[CallerScope, ...]] = Field(
         default_factory=dict,
         alias="AUTH_TOKENS_JSON",
@@ -95,7 +104,6 @@ class Settings(BaseSettings):
     def active_policy(self) -> PolicyProfile:
         """Return the configured active policy profile as a core domain object."""
         configured = self.effective_policy_profiles[self.active_policy_profile]
-        # Merge default publish rules with any overrides from the configured profile
         default_rules = _default_publish_rules()
         merged_rules: dict[TrustTier, PublishRuleSettings] = {
             **default_rules,

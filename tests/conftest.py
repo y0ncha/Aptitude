@@ -30,6 +30,19 @@ def _database_is_available(database_url: str) -> bool:
         engine.dispose()
 
 
+def _reset_database(database_url: str) -> None:
+    """Drop and recreate the public schema for a clean integration DB."""
+    engine = create_engine(database_url, pool_pre_ping=True)
+    try:
+        with engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            connection.execute(text("CREATE SCHEMA public"))
+            connection.execute(text("GRANT ALL ON SCHEMA public TO postgres"))
+            connection.execute(text("GRANT ALL ON SCHEMA public TO public"))
+    finally:
+        engine.dispose()
+
+
 @pytest.fixture(autouse=True)
 def clear_settings_cache() -> Generator[None, None, None]:
     """Ensure tests never share cached settings state."""
@@ -61,3 +74,10 @@ def require_integration_database(integration_database_url: str) -> str:
             "Run `make db-up` and set TEST_DATABASE_URL if needed.",
         )
     return integration_database_url
+
+
+@pytest.fixture
+def clean_integration_database(require_integration_database: str) -> str:
+    """Provide a blank Postgres schema for integration tests."""
+    _reset_database(require_integration_database)
+    return require_integration_database

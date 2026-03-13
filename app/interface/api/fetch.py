@@ -17,7 +17,8 @@ from app.interface.dto.examples import (
     SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
     SKILL_VERSION_RESPONSE_EXAMPLE,
 )
-from app.interface.dto.skills import SEMVER_PATTERN, SLUG_PATTERN, SkillVersionResponse
+from app.interface.dto.skills import SkillVersionResponse
+from app.interface.validation import SEMVER_PATTERN, SLUG_PATTERN
 
 router = APIRouter(tags=["fetch"])
 
