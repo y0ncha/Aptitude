@@ -93,6 +93,13 @@ _SEARCH_CANDIDATES_SQL = text(
             OR doc.search_vector @@ plainto_tsquery('simple'::regconfig, :query_text)
             OR doc.normalized_slug = :query_text
             OR doc.normalized_name = :query_text
+            OR (
+                :query_contains_pattern IS NOT NULL
+                AND (
+                    doc.normalized_slug LIKE :query_contains_pattern ESCAPE '\\'
+                    OR doc.normalized_name LIKE :query_contains_pattern ESCAPE '\\'
+                )
+            )
         )
           AND (
             :required_tag_count = 0
@@ -159,6 +166,7 @@ _SEARCH_CANDIDATES_SQL = text(
     """
 ).bindparams(
     bindparam("query_text", type_=Text()),
+    bindparam("query_contains_pattern", type_=Text()),
     bindparam("required_tags", type_=ARRAY(Text())),
     bindparam("required_tag_count", type_=Integer()),
     bindparam("published_after", type_=DateTime(timezone=True)),
@@ -441,6 +449,7 @@ class SQLAlchemySkillRegistryRepository(
                 _SEARCH_CANDIDATES_SQL,
                 {
                     "query_text": request.query_text,
+                    "query_contains_pattern": _build_contains_pattern(request.query_text),
                     "required_tags": list(request.required_tags),
                     "required_tag_count": len(request.required_tags),
                     "published_after": published_after,
@@ -744,6 +753,13 @@ def _ensure_datetime(value: datetime | None) -> datetime:
 
 def _normalize_text(value: str) -> str:
     return " ".join(value.split()).strip().lower()
+
+
+def _build_contains_pattern(value: str | None) -> str | None:
+    if value is None:
+        return None
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
 
 
 def _to_provenance(entity: SkillVersion) -> ProvenanceMetadata | None:

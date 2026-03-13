@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from app.persistence.models.skill_relationship_selector import SkillRelationshipSelector
-from app.persistence.skill_registry_repository import _sort_relationship_selectors
+from app.persistence.skill_registry_repository import (
+    _build_contains_pattern,
+    _sort_relationship_selectors,
+)
 
 
 def test_sort_relationship_selectors_uses_canonical_edge_family_order() -> None:
@@ -26,3 +29,9 @@ def test_sort_relationship_selectors_uses_canonical_edge_family_order() -> None:
         ("conflicts_with", 0),
         ("overlaps_with", 0),
     ]
+
+
+def test_build_contains_pattern_normalizes_none_and_escapes_like_wildcards() -> None:
+    assert _build_contains_pattern(None) is None
+    assert _build_contains_pattern("python.discovery") == "%python.discovery%"
+    assert _build_contains_pattern(r"python\_%") == r"%python\\\_\%%"

@@ -422,12 +422,10 @@ def _backfill_legacy_compatibility_state() -> None:
                         )
                     )
                 )
-            FROM skills AS s
-            JOIN skill_metadata AS sm
-              ON sm.id = sv.metadata_fk
-            JOIN skill_contents AS sc
-              ON sc.id = sv.content_fk
+            FROM skills AS s, skill_metadata AS sm, skill_contents AS sc
             WHERE s.id = sv.skill_fk
+              AND sm.id = sv.metadata_fk
+              AND sc.id = sv.content_fk
             """
         )
     )

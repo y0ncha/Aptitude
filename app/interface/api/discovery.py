@@ -126,6 +126,6 @@ def search_skills(
             status=tuple(request.status),
             trust_tier=tuple(request.trust_tier),
             limit=request.limit,
-        )
+        ),
     )
     return SkillSearchResponse(results=[to_search_result_response(item) for item in results])

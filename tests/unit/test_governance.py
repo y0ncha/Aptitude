@@ -46,9 +46,11 @@ def test_settings_parse_auth_tokens_and_policy_profiles_from_json() -> None:
 
 @pytest.mark.unit
 def test_governance_policy_blocks_missing_provenance_for_internal_publish() -> None:
-    policy = GovernancePolicy(profile=Settings.model_validate(
-        {"DATABASE_URL": "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude"}
-    ).active_policy)
+    policy = GovernancePolicy(
+        profile=Settings.model_validate(
+            {"DATABASE_URL": "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude"}
+        ).active_policy
+    )
 
     with pytest.raises(PolicyViolation) as exc_info:
         policy.evaluate_publish(
@@ -61,9 +63,11 @@ def test_governance_policy_blocks_missing_provenance_for_internal_publish() -> N
 
 @pytest.mark.unit
 def test_governance_policy_rejects_archived_to_published_transition() -> None:
-    policy = GovernancePolicy(profile=Settings.model_validate(
-        {"DATABASE_URL": "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude"}
-    ).active_policy)
+    policy = GovernancePolicy(
+        profile=Settings.model_validate(
+            {"DATABASE_URL": "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude"}
+        ).active_policy
+    )
 
     with pytest.raises(PolicyViolation) as exc_info:
         policy.evaluate_transition(
