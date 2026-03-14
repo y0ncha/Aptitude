@@ -14,7 +14,7 @@ from starlette.types import ExceptionHandler
 
 from app.audit.recorder import SQLAlchemyAuditRecorder
 from app.core.governance import GovernancePolicy, PolicyViolation
-from app.core.logging import configure_logging
+from app.core.logging import build_logging_config, configure_logging
 from app.core.readiness import ReadinessService
 from app.core.settings import get_settings, reset_settings_cache
 from app.core.skill_discovery import SkillDiscoveryService
@@ -39,6 +39,16 @@ from app.persistence.db import (
     init_engine,
 )
 from app.persistence.skill_registry_repository import SQLAlchemySkillRegistryRepository
+
+STARTUP_BANNER = r"""
+      //| |
+     // | |
+    //__| |     ___     ___ ___
+   / ___  |   //   ) )   / /
+  //    | |  //___/ /   / /
+ //     | | //         / /      ()
+================================================
+"""
 
 # Configure logging before lifespan starts so startup logs are consistently formatted.
 configure_logging(os.getenv("LOG_LEVEL", "INFO"))
@@ -127,3 +137,28 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+def run_dev_server() -> None:
+    """Run uvicorn with the centralized aptitude logging configuration."""
+    import uvicorn
+
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    print(STARTUP_BANNER)
+    reload_enabled = os.getenv("UVICORN_RELOAD", "true").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    uvicorn.run(
+        "app.main:app",
+        host="127.0.0.1",
+        port=int(os.getenv("PORT", "8000")),
+        reload=reload_enabled,
+        log_config=build_logging_config(log_level),
+    )
+
+
+if __name__ == "__main__":
+    run_dev_server()

@@ -16,7 +16,7 @@ def _resolve_level(level: str) -> int:
 
 
 def build_logging_config(level: str) -> dict[str, Any]:
-    """Return unified logging config for app and uvicorn loggers."""
+    """Return logging config with one shared formatter across app and libraries."""
     resolved_level = _resolve_level(level)
     return {
         "version": 1,
@@ -38,6 +38,11 @@ def build_logging_config(level: str) -> dict[str, Any]:
             "level": resolved_level,
         },
         "loggers": {
+            "app": {
+                "handlers": ["default"],
+                "level": resolved_level,
+                "propagate": False,
+            },
             "uvicorn": {
                 "handlers": ["default"],
                 "level": resolved_level,
@@ -49,6 +54,31 @@ def build_logging_config(level: str) -> dict[str, Any]:
                 "propagate": False,
             },
             "uvicorn.access": {
+                "handlers": ["default"],
+                "level": resolved_level,
+                "propagate": False,
+            },
+            "fastapi": {
+                "handlers": ["default"],
+                "level": resolved_level,
+                "propagate": False,
+            },
+            "watchfiles": {
+                "handlers": ["default"],
+                "level": resolved_level,
+                "propagate": False,
+            },
+            "watchfiles.main": {
+                "handlers": ["default"],
+                "level": resolved_level,
+                "propagate": False,
+            },
+            "sqlalchemy": {
+                "handlers": ["default"],
+                "level": resolved_level,
+                "propagate": False,
+            },
+            "psycopg": {
                 "handlers": ["default"],
                 "level": resolved_level,
                 "propagate": False,
