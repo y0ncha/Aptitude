@@ -1,8 +1,9 @@
 $kind: http-request
+name: Publish Skill v1
 order: 6000
 
 method: POST
-url: '{{baseUrl}}/skill-versions'
+url: "{{baseUrl}}/skill-versions"
 
 headers:
   - key: Accept
@@ -12,12 +13,12 @@ headers:
     value: application/json
     description: Send the normalized JSON publish contract
   - key: Authorization
-    value: 'Bearer {{publishToken}}'
+    value: bearer {{publishToken}}
     description: Authenticate with a caller that has the `publish` scope
 
 body:
   type: json
-  content: |-
+  content: >-
     {
       "slug": "{{sanity_primary_slug}}",
       "version": "{{sanity_version_1}}",
@@ -74,13 +75,14 @@ body:
 
 scripts:
   - type: afterResponse
-    language: text/javascript
-    code: |-
+    code: >-
       const json = pm.response.json();
+
 
       pm.test('Status is 201', () => {
         pm.response.to.have.status(201);
       });
+
 
       pm.test('Publish v1 response matches the requested identity', () => {
         pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));
@@ -94,4 +96,7 @@ scripts:
         pm.expect(json).to.not.have.property('relationships');
       });
 
-      pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Skill v2' : null);
+
+      pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Skill v2'
+      : null);
+    language: text/javascript
