@@ -54,5 +54,3 @@ htmlcov/
 .uv-cache
 
 .tmp_migration.db
-/docs/guides/setup-dev.md
-deployment/

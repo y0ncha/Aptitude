@@ -1,0 +1,60 @@
+services:
+  db:
+    image: ${POSTGRES_IMAGE:-postgres:15.17}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aptitude}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .deployment/resources/.env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-aptitude}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - aptitude-postgres-data:/var/lib/postgresql/data
+    networks:
+      - aptitude
+
+  server:
+    image: ${APP_IMAGE:-aptitude-server:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .deployment/resources/.env}@db:5432/${POSTGRES_DB:-aptitude}
+      AUTH_TOKENS_JSON: ${AUTH_TOKENS_JSON:?Set AUTH_TOKENS_JSON in .deployment/resources/.env}
+      ACTIVE_POLICY_PROFILE: ${ACTIVE_POLICY_PROFILE:-default}
+      APP_ENV: ${APP_ENV:-container}
+      APP_NAME: ${APP_NAME:-aptitude-server}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      POLICY_PROFILES_JSON: ${POLICY_PROFILES_JSON:-{}}
+      PORT: "8000"
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz').read()\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - aptitude
+
+volumes:
+  aptitude-postgres-data:
+
+networks:
+  aptitude:
