@@ -16,7 +16,6 @@ migrations.
 - `skill_metadata.py`: normalized metadata storage (`skill_metadata`).
 - `skill_relationship_selector.py`: authored relationship selectors
   (`skill_relationship_selectors`).
-- `skill_dependency.py`: exact relationship projection (`skill_dependencies`).
 - `skill_search_document.py`: denormalized advisory search documents (`skill_search_documents`)
   for compact candidate retrieval.
 - `audit_event.py`: audit event table (`audit_events`).

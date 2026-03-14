@@ -9,17 +9,14 @@ import pytest
 from app.core.governance import CallerIdentity, GovernancePolicy, build_default_policy_profile
 from app.core.ports import (
     CreateSkillVersionRecord,
-    StoredSkillIdentity,
     StoredSkillVersion,
     StoredSkillVersionStatus,
-    StoredSkillVersionSummary,
 )
 from app.core.skill_registry import (
     CreateSkillVersionCommand,
     DuplicateSkillVersionError,
     SkillContentInput,
     SkillMetadataInput,
-    SkillNotFoundError,
     SkillRegistryService,
     SkillRelationshipsInput,
 )
@@ -64,40 +61,6 @@ class FakeRegistry:
         )
         self._records[key] = stored
         return stored
-
-    def get_skill(self, *, slug: str) -> StoredSkillIdentity | None:
-        versions = [
-            record for (stored_slug, _), record in self._records.items() if stored_slug == slug
-        ]
-        if not versions:
-            return None
-        current = max(versions, key=lambda item: (item.published_at, item.version))
-        return StoredSkillIdentity(
-            slug=slug,
-            current_version=current.version,
-            created_at=current.published_at,
-            updated_at=current.published_at,
-        )
-
-    def list_versions(self, *, slug: str) -> tuple[StoredSkillVersionSummary, ...]:
-        return tuple(
-            StoredSkillVersionSummary(
-                slug=record.slug,
-                version=record.version,
-                version_checksum_digest=record.version_checksum_digest,
-                content_checksum_digest=record.content_checksum_digest,
-                content_size_bytes=record.content_size_bytes,
-                rendered_summary=record.rendered_summary,
-                name=record.name,
-                description=record.description,
-                tags=record.tags,
-                lifecycle_status=record.lifecycle_status,
-                trust_tier=record.trust_tier,
-                published_at=record.published_at,
-            )
-            for (stored_slug, _), record in self._records.items()
-            if stored_slug == slug
-        )
 
     def get_version(self, *, slug: str, version: str) -> StoredSkillVersion | None:
         return self._records.get((slug, version))
@@ -178,10 +141,6 @@ def _publish_caller() -> CallerIdentity:
     return CallerIdentity(token="publish", scopes=frozenset({"publish", "read"}))
 
 
-def _read_caller() -> CallerIdentity:
-    return CallerIdentity(token="read", scopes=frozenset({"read"}))
-
-
 @pytest.mark.unit
 def test_publish_version_returns_checksum_and_records_audit() -> None:
     registry = FakeRegistry()
@@ -217,15 +176,3 @@ def test_publish_version_rejects_duplicates() -> None:
 
     with pytest.raises(DuplicateSkillVersionError):
         service.publish_version(caller=_publish_caller(), command=command)
-
-
-@pytest.mark.unit
-def test_get_skill_raises_not_found_for_unknown_slug() -> None:
-    service = SkillRegistryService(
-        registry=FakeRegistry(),
-        audit_recorder=FakeAuditRecorder(),
-        governance_policy=_governance_policy(),
-    )
-
-    with pytest.raises(SkillNotFoundError):
-        service.get_skill(caller=_read_caller(), slug="missing.skill")

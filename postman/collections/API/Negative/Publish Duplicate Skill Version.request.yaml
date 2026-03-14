@@ -69,5 +69,5 @@ scripts:
       });
 
       pm.execution.setNextRequest(
-        pm.response.code === 409 ? 'Batch Fetch Missing Skill Metadata' : null,
+        pm.response.code === 409 ? 'Fetch Missing Skill Metadata' : null,
       );

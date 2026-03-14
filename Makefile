@@ -1,6 +1,9 @@
 UV ?= UV_CACHE_DIR=.uv-cache uv
+DOCKER_IMAGE ?= y0ncha/aptitude-server
+DOCKER_TAG ?= latest
+DOCKER_IMAGE_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
 
-.PHONY: run debug test lint format typecheck migrate-up migrate-down db-up db-down
+.PHONY: run debug test lint format typecheck migrate-up migrate-down db-up db-down docker-build docker-push docker-build-push
 
 run:
 	@printf "\033[1;36m==>\033[0m \033[1mStarting FastAPI dev server\033[0m\n"
@@ -40,3 +43,11 @@ db-up:
 
 db-down:
 	docker compose down -v
+
+docker-build:
+	docker build -t $(DOCKER_IMAGE_REF) .
+
+docker-push:
+	docker push $(DOCKER_IMAGE_REF)
+
+docker-build-push: docker-build docker-push

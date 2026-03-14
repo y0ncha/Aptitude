@@ -43,5 +43,5 @@ scripts:
       });
 
       pm.execution.setNextRequest(
-        pm.response.code === 200 ? 'Batch Fetch Published Skill Metadata' : null,
+        pm.response.code === 200 ? 'Fetch Published Skill Metadata' : null,
       );

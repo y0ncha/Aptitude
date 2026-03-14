@@ -104,6 +104,7 @@ Use the smallest relevant set of docs for the task at hand.
 - Work on one milestone plan file at a time under `plans/XX-*.md`.
 - Do not start the next plan file before the current one meets its acceptance criteria.
 - Keep plan files append-only. Do not renumber or rename completed plans.
+- When updating a plan, harmonize `plans/roadmap.md` and all downstream `plans/XX-*.md` files so sequencing, scope, and acceptance criteria stay aligned.
 - Every implementation PR should map to exactly one active plan file.
 - When finishing work on a plan, review older changelogs and prior implementation work for logic conflicts, redundancy, and code that should now be removed.
 

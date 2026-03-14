@@ -18,4 +18,3 @@ VERSION_CONSTRAINT_PATTERN = re.compile(
     rf"(?:,\s*(?:==|=|!=|>=|<=|>|<)\s*{SEMVER_CORE}\s*)*$"
 )
 MARKER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
-MAX_BATCH_ITEMS = 100

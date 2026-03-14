@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.governance import LifecycleStatus, TrustTier
 from app.interface.validation import (
     MARKER_PATTERN,
-    MAX_BATCH_ITEMS,
     SEMVER_PATTERN,
     SLUG_PATTERN,
     VERSION_CONSTRAINT_PATTERN,
 )
-
-BatchItemStatus = Literal["found", "not_found"]
 
 
 def _normalize_unique_tags(value: list[str]) -> list[str]:
@@ -29,23 +26,6 @@ def _normalize_unique_tags(value: list[str]) -> list[str]:
         seen.add(tag)
         normalized.append(tag)
     return normalized
-
-
-class SkillVersionCoordinateRequest(BaseModel):
-    """Exact immutable slug/version coordinate."""
-
-    slug: str = Field(
-        min_length=1,
-        max_length=128,
-        pattern=SLUG_PATTERN,
-        description="Stable public slug of the requested skill.",
-    )
-    version: str = Field(
-        pattern=SEMVER_PATTERN,
-        description="Exact immutable semantic version of the requested skill.",
-    )
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class DependencySelectorRequest(BaseModel):
@@ -302,7 +282,7 @@ class ProvenanceResponse(BaseModel):
 
 
 class SkillVersionMetadataResponse(BaseModel):
-    """Immutable metadata envelope returned by publish and metadata batch fetch."""
+    """Immutable metadata envelope returned by publish and exact metadata fetch."""
 
     slug: str
     version: str
@@ -358,31 +338,6 @@ class SkillDependencyResolutionResponse(BaseModel):
     slug: str
     version: str
     depends_on: list[DependencySelectorResponse]
-
-
-class SkillVersionBatchRequest(BaseModel):
-    """Ordered exact immutable coordinate batch request."""
-
-    coordinates: list[SkillVersionCoordinateRequest] = Field(
-        min_length=1,
-        max_length=MAX_BATCH_ITEMS,
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class SkillVersionMetadataBatchItemResponse(BaseModel):
-    """One ordered immutable metadata batch result."""
-
-    status: BatchItemStatus
-    coordinate: SkillVersionCoordinateRequest
-    item: SkillVersionMetadataResponse | None = None
-
-
-class SkillVersionMetadataBatchResponse(BaseModel):
-    """Ordered immutable metadata batch response."""
-
-    results: list[SkillVersionMetadataBatchItemResponse]
 
 
 class SkillVersionStatusUpdateRequest(BaseModel):

@@ -1,4 +1,4 @@
-"""Primary normalized skill write and identity/list routes."""
+"""Primary normalized skill write and lifecycle routes."""
 
 from __future__ import annotations
 

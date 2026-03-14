@@ -1,19 +1,18 @@
-"""Integration tests for the hard-cut registry API surface."""
+"""Integration tests for the registry API surface."""
 
 from __future__ import annotations
 
-from email.parser import BytesParser
-from email.policy import default as email_policy
 from typing import Any
 from uuid import uuid4
 
 import pytest
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 
 from alembic import command
 from app.main import create_app
+from app.persistence.db import get_session_factory
 
 
 @pytest.fixture
@@ -104,16 +103,41 @@ def _update_status(
     return response.json()
 
 
-def _parse_multipart_parts(response: Any) -> list[Any]:
-    content_type = response.headers["content-type"]
-    raw = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode() + response.content
-    message = BytesParser(policy=email_policy).parsebytes(raw)
-    assert message.is_multipart()
-    return list(message.iter_parts())
+def _query_storage_counts(database_url: str, *, slug: str) -> dict[str, int]:
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            row = (
+                connection.execute(
+                    text(
+                        """
+                        SELECT
+                            COUNT(*) AS version_count,
+                            COUNT(DISTINCT skill_versions.content_fk) AS distinct_content_fk_count
+                        FROM skill_versions
+                        JOIN skills ON skills.id = skill_versions.skill_fk
+                        WHERE skills.slug = :slug
+                        """
+                    ),
+                    {"slug": slug},
+                )
+                .mappings()
+                .one()
+            )
+            content_count = connection.execute(
+                text("SELECT COUNT(*) FROM skill_contents")
+            ).scalar_one()
+            return {
+                "version_count": int(row["version_count"]),
+                "distinct_content_fk_count": int(row["distinct_content_fk_count"]),
+                "content_count": int(content_count),
+            }
+    finally:
+        engine.dispose()
 
 
 @pytest.mark.integration
-def test_publish_discovery_resolution_and_batch_fetch(
+def test_publish_discovery_resolution_and_exact_fetch(
     monkeypatch: pytest.MonkeyPatch,
     migrated_registry_database: str,
 ) -> None:
@@ -165,24 +189,12 @@ def test_publish_discovery_resolution_and_batch_fetch(
             f"/resolution/{source_slug}/2.0.0",
             headers=_headers("reader-token"),
         )
-        metadata = client.post(
-            "/fetch/metadata:batch",
-            json={
-                "coordinates": [
-                    {"slug": source_slug, "version": "2.0.0"},
-                    {"slug": "python.missing", "version": "9.9.9"},
-                ]
-            },
+        metadata = client.get(
+            f"/skills/{source_slug}/versions/2.0.0",
             headers=_headers("reader-token"),
         )
-        content = client.post(
-            "/fetch/content:batch",
-            json={
-                "coordinates": [
-                    {"slug": source_slug, "version": "2.0.0"},
-                    {"slug": "python.missing", "version": "9.9.9"},
-                ]
-            },
+        content = client.get(
+            f"/skills/{source_slug}/versions/2.0.0/content",
             headers=_headers("reader-token"),
         )
 
@@ -210,29 +222,122 @@ def test_publish_discovery_resolution_and_batch_fetch(
 
     assert metadata.status_code == 200
     metadata_body = metadata.json()
-    assert [item["status"] for item in metadata_body["results"]] == ["found", "not_found"]
-    assert metadata_body["results"][0]["coordinate"] == {"slug": source_slug, "version": "2.0.0"}
-    assert metadata_body["results"][0]["item"]["slug"] == source_slug
-    assert metadata_body["results"][0]["item"]["version"] == "2.0.0"
-    assert "relationships" not in metadata_body["results"][0]["item"]
-    assert "content_download_path" not in metadata_body["results"][0]["item"]
-    assert metadata_body["results"][1]["item"] is None
+    assert metadata_body["slug"] == source_slug
+    assert metadata_body["version"] == "2.0.0"
+    assert "relationships" not in metadata_body
+    assert "content_download_path" not in metadata_body
 
     assert content.status_code == 200
-    assert content.headers["content-type"].startswith("multipart/mixed; boundary=")
-    parts = _parse_multipart_parts(content)
-    assert len(parts) == 2
-    assert parts[0]["X-Aptitude-Slug"] == source_slug
-    assert parts[0]["X-Aptitude-Version"] == "2.0.0"
-    assert parts[0]["X-Aptitude-Status"] == "found"
-    assert parts[0]["ETag"] == published["content"]["checksum"]["digest"]
-    assert parts[0]["Cache-Control"] == "public, immutable"
-    assert parts[0]["Content-Length"] == str(len(b"# v2\n"))
-    assert parts[0].get_payload(decode=True).decode("utf-8") == "# v2\n"
-    assert parts[1]["X-Aptitude-Slug"] == "python.missing"
-    assert parts[1]["X-Aptitude-Version"] == "9.9.9"
-    assert parts[1]["X-Aptitude-Status"] == "not_found"
-    assert parts[1].get_payload(decode=True) == b""
+    assert content.headers["content-type"].startswith("text/markdown; charset=utf-8")
+    assert content.headers["ETag"] == published["content"]["checksum"]["digest"]
+    assert content.headers["Cache-Control"] == "public, immutable"
+    assert content.headers["Content-Length"] == str(len(b"# v2\n"))
+    assert content.text == "# v2\n"
+
+
+@pytest.mark.integration
+def test_publish_reuses_digest_backed_content_rows_for_identical_content(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    slug = f"python.dedup.{uuid4().hex}"
+
+    with TestClient(create_app()) as client:
+        first = _publish(
+            client,
+            _request(
+                slug,
+                "1.0.0",
+                raw_markdown="# Shared Content\n",
+                description="First publish of shared content",
+            ),
+        )
+        second = _publish(
+            client,
+            _request(
+                slug,
+                "2.0.0",
+                raw_markdown="# Shared Content\n",
+                description="Second publish of shared content",
+            ),
+        )
+
+    counts = _query_storage_counts(migrated_registry_database, slug=slug)
+
+    assert first["content"]["checksum"]["digest"] == second["content"]["checksum"]["digest"]
+    assert counts == {
+        "version_count": 2,
+        "distinct_content_fk_count": 1,
+        "content_count": 1,
+    }
+
+
+@pytest.mark.integration
+def test_exact_fetch_returns_not_found_for_missing_coordinates(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+
+    with TestClient(create_app()) as client:
+        metadata = client.get(
+            "/skills/python.missing/versions/9.9.9",
+            headers=_headers("reader-token"),
+        )
+        content = client.get(
+            "/skills/python.missing/versions/9.9.9/content",
+            headers=_headers("reader-token"),
+        )
+
+    assert metadata.status_code == 404
+    assert metadata.json()["error"]["code"] == "SKILL_VERSION_NOT_FOUND"
+    assert content.status_code == 404
+    assert content.json()["error"]["code"] == "SKILL_VERSION_NOT_FOUND"
+
+
+@pytest.mark.integration
+def test_publish_distinct_content_creates_distinct_rows_and_exact_fetch_returns_markdown(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    slug = f"python.distinct.{uuid4().hex}"
+
+    with TestClient(create_app()) as client:
+        first = _publish(
+            client,
+            _request(
+                slug,
+                "1.0.0",
+                raw_markdown="# v1\n",
+                description="First distinct version",
+            ),
+        )
+        second = _publish(
+            client,
+            _request(
+                slug,
+                "2.0.0",
+                raw_markdown="# v2\n",
+                description="Second distinct version",
+            ),
+        )
+        response = client.get(
+            f"/skills/{slug}/versions/2.0.0/content",
+            headers=_headers("reader-token"),
+        )
+
+    counts = _query_storage_counts(migrated_registry_database, slug=slug)
+    assert response.status_code == 200
+    assert first["content"]["checksum"]["digest"] != second["content"]["checksum"]["digest"]
+    assert counts == {
+        "version_count": 2,
+        "distinct_content_fk_count": 2,
+        "content_count": 2,
+    }
+    assert response.headers["ETag"] == second["content"]["checksum"]["digest"]
+    assert response.text == "# v2\n"
 
 
 @pytest.mark.integration
@@ -351,7 +456,7 @@ def test_status_transitions_recompute_current_default(
 
 
 @pytest.mark.integration
-def test_governance_applies_to_discovery_resolution_and_batch_fetch(
+def test_governance_applies_to_discovery_resolution_and_exact_fetch(
     monkeypatch: pytest.MonkeyPatch,
     migrated_registry_database: str,
 ) -> None:
@@ -422,20 +527,21 @@ def test_governance_applies_to_discovery_resolution_and_batch_fetch(
             f"/resolution/{archived_slug}/1.0.0",
             headers=_headers("admin-token"),
         )
-        archived_metadata_forbidden = client.post(
-            "/fetch/metadata:batch",
-            json={"coordinates": [{"slug": archived_slug, "version": "1.0.0"}]},
+        archived_metadata_forbidden = client.get(
+            f"/skills/{archived_slug}/versions/1.0.0",
             headers=_headers("reader-token"),
         )
-        archived_metadata_admin = client.post(
-            "/fetch/metadata:batch",
-            json={"coordinates": [{"slug": archived_slug, "version": "1.0.0"}]},
+        archived_metadata_admin = client.get(
+            f"/skills/{archived_slug}/versions/1.0.0",
             headers=_headers("admin-token"),
         )
-        archived_content_forbidden = client.post(
-            "/fetch/content:batch",
-            json={"coordinates": [{"slug": archived_slug, "version": "1.0.0"}]},
+        archived_content_forbidden = client.get(
+            f"/skills/{archived_slug}/versions/1.0.0/content",
             headers=_headers("reader-token"),
+        )
+        archived_content_admin = client.get(
+            f"/skills/{archived_slug}/versions/1.0.0/content",
+            headers=_headers("admin-token"),
         )
 
     assert published_discovery.status_code == 200
@@ -454,10 +560,63 @@ def test_governance_applies_to_discovery_resolution_and_batch_fetch(
     assert archived_metadata_forbidden.status_code == 403
     assert archived_metadata_forbidden.json()["error"]["code"] == "POLICY_EXACT_READ_FORBIDDEN"
     assert archived_metadata_admin.status_code == 200
-    assert archived_metadata_admin.json()["results"][0]["status"] == "found"
+    assert archived_metadata_admin.json()["slug"] == archived_slug
 
     assert archived_content_forbidden.status_code == 403
     assert archived_content_forbidden.json()["error"]["code"] == "POLICY_EXACT_READ_FORBIDDEN"
+    assert archived_content_admin.status_code == 200
+    assert archived_content_admin.text.startswith("# Python Lint")
+
+
+@pytest.mark.integration
+def test_discovery_queries_search_documents_without_touching_skill_contents(
+    monkeypatch: pytest.MonkeyPatch,
+    migrated_registry_database: str,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
+    slug = f"python.discovery.metadata-only.{uuid4().hex}"
+
+    with TestClient(create_app()) as client:
+        _publish(
+            client,
+            _request(
+                slug,
+                "1.0.0",
+                raw_markdown="# Metadata Only Discovery\n",
+                name="Metadata Only Discovery",
+                description="Search document should satisfy discovery",
+            ),
+        )
+
+        engine = get_session_factory().kw["bind"]
+        executed_selects: list[str] = []
+
+        def _capture_selects(
+            _conn: Any,
+            _cursor: Any,
+            statement: str,
+            _parameters: Any,
+            _context: Any,
+            _executemany: bool,
+        ) -> None:
+            normalized_statement = " ".join(statement.split())
+            if normalized_statement.upper().startswith(("SELECT", "WITH")):
+                executed_selects.append(normalized_statement)
+
+        event.listen(engine, "before_cursor_execute", _capture_selects)
+        try:
+            response = client.post(
+                "/discovery",
+                json={"name": "Metadata Only Discovery"},
+                headers=_headers("reader-token"),
+            )
+        finally:
+            event.remove(engine, "before_cursor_execute", _capture_selects)
+
+    assert response.status_code == 200
+    assert response.json()["candidates"] == [slug]
+    assert any("skill_search_documents" in statement for statement in executed_selects)
+    assert all("skill_contents" not in statement for statement in executed_selects)
 
 
 @pytest.mark.integration

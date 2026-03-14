@@ -6,12 +6,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.core.ports import StoredRelationshipSelector, StoredSkillIdentity, StoredSkillVersion
-from app.core.skill_version_projections import (
-    to_current_version_reference,
-    to_skill_version_detail,
-    to_skill_version_summary,
-)
+from app.core.ports import StoredRelationshipSelector, StoredSkillVersion
+from app.core.skill_version_projections import to_skill_version_detail
 
 
 def _stored_version() -> StoredSkillVersion:
@@ -59,21 +55,3 @@ def test_to_skill_version_detail_returns_immutable_metadata_without_relationship
     assert detail.metadata.name == "Python Lint"
     assert detail.lifecycle_status == "published"
     assert detail.published_at == datetime(2026, 3, 13, 9, 0, tzinfo=UTC)
-
-
-@pytest.mark.unit
-def test_to_current_version_reference_uses_visible_summary_versions() -> None:
-    stored = _stored_version()
-    summary = to_skill_version_summary(stored=stored)
-    identity = StoredSkillIdentity(
-        slug="python.lint",
-        current_version="1.0.0",
-        created_at=summary.published_at,
-        updated_at=summary.published_at,
-    )
-
-    current = to_current_version_reference(stored=identity, visible_versions=(summary,))
-
-    assert current is not None
-    assert current.version == "1.0.0"
-    assert current.lifecycle_status == "published"

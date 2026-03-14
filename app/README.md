@@ -14,7 +14,7 @@ metadata-oriented intelligence work.
 - `app/audit/`: audit port adapters.
 - `app/core/`: domain services for immutable catalog reads/writes, settings, ports,
   advisory search, and dependency providers.
-- `app/interface/`: API interface boundary.
+- `app/interface/`: API interface boundary for publish, discovery, exact dependency reads, and exact metadata/content fetch.
 - `app/persistence/`: database/artifact adapters and ORM models for immutable
   manifests, integrity metadata, dependency declaration projections, and search read models.
 - `app/intelligence/`: search-ranking helpers and future metadata/graph intelligence.

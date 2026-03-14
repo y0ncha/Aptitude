@@ -30,24 +30,16 @@ from app.core.skill_models import (
     SkillChecksum,
     SkillContentDocument,
     SkillContentInput,
-    SkillIdentity,
     SkillMetadata,
     SkillMetadataInput,
-    SkillNotFoundError,
     SkillRegistryError,
     SkillRelationshipSelector,
     SkillRelationshipsInput,
     SkillVersionDetail,
     SkillVersionNotFoundError,
-    SkillVersionReference,
     SkillVersionStatusUpdate,
-    SkillVersionSummary,
 )
-from app.core.skill_version_projections import (
-    to_current_version_reference,
-    to_skill_version_detail,
-    to_skill_version_summary,
-)
+from app.core.skill_version_projections import to_skill_version_detail
 
 __all__ = [
     "SHA256_ALGORITHM",
@@ -58,23 +50,19 @@ __all__ = [
     "SkillContentDocument",
     "SkillContentInput",
     "SkillGovernanceInput",
-    "SkillIdentity",
     "SkillMetadata",
     "SkillMetadataInput",
-    "SkillNotFoundError",
     "SkillRegistryError",
     "SkillRelationshipSelector",
     "SkillRelationshipsInput",
     "SkillVersionDetail",
     "SkillVersionNotFoundError",
-    "SkillVersionReference",
     "SkillVersionStatusUpdate",
-    "SkillVersionSummary",
 ]
 
 
 class SkillRegistryService:
-    """Core service for immutable publish plus identity/list reads."""
+    """Core service for immutable publish plus lifecycle updates."""
 
     def __init__(
         self,
@@ -152,59 +140,6 @@ class SkillRegistryService:
             },
         )
         return to_skill_version_detail(stored=stored)
-
-    def get_skill(self, *, caller: CallerIdentity, slug: str) -> SkillIdentity:
-        """Return one logical skill identity."""
-        stored = self._registry.get_skill(slug=slug)
-        if stored is None:
-            raise SkillNotFoundError(slug=slug)
-
-        visible_versions = self.list_versions(caller=caller, slug=slug)
-        current_version = to_current_version_reference(
-            stored=stored,
-            visible_versions=visible_versions,
-        )
-        status = (
-            current_version.lifecycle_status
-            if current_version is not None
-            else visible_versions[0].lifecycle_status
-        )
-
-        return SkillIdentity(
-            slug=stored.slug,
-            status=status,
-            current_version=current_version,
-            created_at=stored.created_at,
-            updated_at=stored.updated_at,
-        )
-
-    def list_versions(
-        self,
-        *,
-        caller: CallerIdentity,
-        slug: str,
-    ) -> tuple[SkillVersionSummary, ...]:
-        """Return deterministic summaries for all versions of a skill."""
-        versions = self._registry.list_versions(slug=slug)
-        if not versions:
-            raise SkillNotFoundError(slug=slug)
-
-        visible_versions = tuple(
-            to_skill_version_summary(stored=record)
-            for record in versions
-            if self._governance_policy.is_visible_in_list(
-                caller=caller,
-                lifecycle_status=record.lifecycle_status,
-            )
-        )
-        if not visible_versions:
-            raise SkillNotFoundError(slug=slug)
-
-        self._audit_recorder.record_event(
-            event_type="skill.versions_listed",
-            payload={"slug": slug, "count": len(visible_versions)},
-        )
-        return visible_versions
 
     def update_version_status(
         self,

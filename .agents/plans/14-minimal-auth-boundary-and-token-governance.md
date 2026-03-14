@@ -15,7 +15,7 @@ After `dev`, `test`, and `prod` are standardized in Plan 13, introduce a minimal
 - Keep FastAPI responsible only for extracting bearer credentials from HTTP requests.
 - Move token validation, caller identity construction, and scope enforcement into a dedicated auth layer outside route dependencies.
 - Add a small port/adapter boundary for token lookup so the initial implementation can remain settings-backed while allowing later replacement with a secret manager or identity adapter.
-- Standardize auth error codes and request handling across publish, discovery, resolution, metadata batch fetch, content batch fetch, and lifecycle routes.
+- Standardize auth error codes and request handling across publish, discovery, resolution, exact metadata fetch, exact content fetch, and lifecycle routes.
 - Manage auth mechanisms explicitly by environment:
   - `prod`: auth required, opaque bearer tokens only
   - `test`: auth enabled by default so tests exercise real auth behavior

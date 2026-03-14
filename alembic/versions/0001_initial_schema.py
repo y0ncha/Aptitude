@@ -37,7 +37,6 @@ def upgrade() -> None:
         "skills",
         sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
         sa.Column("slug", sa.Text(), nullable=False),
-        sa.Column("current_version_id", sa.BigInteger(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -148,14 +147,6 @@ def upgrade() -> None:
         "skill_versions",
         ["skill_fk", "version"],
     )
-    op.create_foreign_key(
-        "fk_skills_current_version_id",
-        "skills",
-        "skill_versions",
-        ["current_version_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
 
     op.create_table(
         "skill_relationship_selectors",
@@ -188,37 +179,6 @@ def upgrade() -> None:
         "ix_skill_relationship_selectors_source_edge_type_ordinal",
         "skill_relationship_selectors",
         ["source_skill_version_fk", "edge_type", "ordinal"],
-    )
-
-    op.create_table(
-        "skill_dependencies",
-        sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
-        sa.Column("from_version_fk", sa.BigInteger(), nullable=False),
-        sa.Column("to_version_fk", sa.BigInteger(), nullable=False),
-        sa.Column("constraint_type", sa.Text(), nullable=False),
-        sa.Column("version_constraint", sa.Text(), nullable=True),
-        sa.CheckConstraint(
-            "constraint_type IN ('depends_on', 'extends', 'conflicts_with', 'overlaps_with')",
-            name="ck_skill_dependencies_constraint_type",
-        ),
-        sa.ForeignKeyConstraint(["from_version_fk"], ["skill_versions.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["to_version_fk"], ["skill_versions.id"], ondelete="CASCADE"),
-    )
-    op.create_index(
-        "ix_skill_dependencies_from_version_fk",
-        "skill_dependencies",
-        ["from_version_fk"],
-    )
-    op.create_index(
-        "ix_skill_dependencies_to_version_fk",
-        "skill_dependencies",
-        ["to_version_fk"],
-    )
-    op.create_index(
-        "uq_skill_dependencies_exact_edge",
-        "skill_dependencies",
-        ["from_version_fk", "to_version_fk", "constraint_type"],
-        unique=True,
     )
 
     op.create_table(
@@ -319,9 +279,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_skills_current_version_id", "skills", type_="foreignkey")
     op.drop_table("skill_search_documents")
-    op.drop_table("skill_dependencies")
     op.drop_table("skill_relationship_selectors")
     op.drop_table("skill_versions")
     op.drop_table("skill_metadata")

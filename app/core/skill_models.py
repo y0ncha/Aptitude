@@ -114,34 +114,6 @@ class SkillMetadata:
 
 
 @dataclass(frozen=True, slots=True)
-class SkillVersionReference:
-    """Compact exact version reference used by identity and relationship payloads."""
-
-    slug: str
-    version: str
-    name: str
-    description: str | None
-    tags: tuple[str, ...]
-    lifecycle_status: LifecycleStatus
-    trust_tier: TrustTier
-    published_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
-class SkillVersionSummary:
-    """Summary projection used by list and relationship responses."""
-
-    slug: str
-    version: str
-    version_checksum: SkillChecksum
-    content: SkillContentSummary
-    metadata: SkillMetadata
-    lifecycle_status: LifecycleStatus
-    trust_tier: TrustTier
-    published_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
 class SkillVersionDetail:
     """Detailed immutable metadata projection without the raw markdown body."""
 
@@ -154,17 +126,6 @@ class SkillVersionDetail:
     trust_tier: TrustTier
     provenance: ProvenanceMetadata | None
     published_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
-class SkillIdentity:
-    """Logical skill identity returned by the registry API."""
-
-    slug: str
-    status: LifecycleStatus
-    current_version: SkillVersionReference | None
-    created_at: datetime
-    updated_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,11 +160,3 @@ class SkillVersionNotFoundError(SkillRegistryError):
         super().__init__(f"Skill version not found: {slug}@{version}")
         self.slug = slug
         self.version = version
-
-
-class SkillNotFoundError(SkillRegistryError):
-    """Raised when a logical skill slug is unknown."""
-
-    def __init__(self, *, slug: str) -> None:
-        super().__init__(f"Skill not found: {slug}")
-        self.slug = slug

@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from app.interface.dto.skills import (
     SkillDiscoveryRequest,
-    SkillVersionBatchRequest,
     SkillVersionCreateRequest,
 )
 
@@ -147,11 +146,12 @@ def test_discovery_request_trims_name_and_deduplicates_tags() -> None:
 
 
 @pytest.mark.unit
-def test_version_batch_request_rejects_unknown_fields() -> None:
+def test_discovery_request_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError):
-        SkillVersionBatchRequest.model_validate(
+        SkillDiscoveryRequest.model_validate(
             {
-                "coordinates": [{"slug": "python.lint", "version": "1.0.0"}],
+                "name": "Python Lint",
+                "tags": ["python"],
                 "edge_types": ["depends_on"],
             }
         )

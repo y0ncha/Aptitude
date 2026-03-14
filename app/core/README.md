@@ -12,7 +12,7 @@ that infrastructure layers implement.
 - `skill_registry.py`: immutable publish/status service + shared domain errors/models.
 - `skill_discovery.py`: discovery service facade for ordered candidate slug retrieval.
 - `skill_resolution.py`: exact direct dependency read service for authored `depends_on` selectors.
-- `skill_fetch.py`: immutable metadata and markdown batch fetch service.
+- `skill_fetch.py`: exact immutable metadata and markdown fetch service.
 - `skill_search.py`: advisory search query/result models and implementation reused by discovery.
 - `ports.py`: protocol contracts for publish, exact version reads, relationship reads, discovery, artifacts, audit, and readiness.
 - `dependencies.py`: FastAPI dependency providers and typed aliases
@@ -29,7 +29,8 @@ that infrastructure layers implement.
   graphs, generate locks, or build execution plans.
 - Core discovery remains candidate retrieval only; ranking is advisory and not authoritative for resolver choice.
 - Core resolution returns only direct authored dependency selectors; no transitive traversal or solving belongs here.
-- Core fetch composes PostgreSQL-backed metadata and markdown reads in ordered batches.
+- Core fetch composes PostgreSQL-backed metadata and markdown reads for single exact immutable coordinates.
+- Core registry status updates derive `is_current_default` from canonical version ordering instead of a stored pointer on `skills`.
 - Logging configuration is defined once in core and reused by runtime entrypoints.
 - Dependency providers in `dependencies.py` assume startup has initialized
   the process-scoped services stored under `app.state`.

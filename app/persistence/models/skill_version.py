@@ -24,7 +24,6 @@ from app.persistence.models.base import Base
 if TYPE_CHECKING:
     from app.persistence.models.skill import Skill
     from app.persistence.models.skill_content import SkillContent
-    from app.persistence.models.skill_dependency import SkillDependency
     from app.persistence.models.skill_metadata import SkillMetadata
     from app.persistence.models.skill_relationship_selector import SkillRelationshipSelector
 
@@ -112,9 +111,4 @@ class SkillVersion(Base):
         cascade="all, delete-orphan",
         order_by="SkillRelationshipSelector.ordinal",
         back_populates="skill_version",
-    )
-    dependencies_from: Mapped[list[SkillDependency]] = relationship(
-        cascade="all, delete-orphan",
-        foreign_keys="SkillDependency.from_version_fk",
-        back_populates="source_version",
     )

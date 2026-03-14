@@ -47,7 +47,7 @@ Aptitude provides immutable artifacts, checksums, trust metadata, and auditable 
 
 Aptitude separates registry authority from resolution authority.
 
-- Registry authority (`aptitude-server`): publish, exact fetch, list, search candidate retrieval, discovery metadata, governance metadata.
+- Registry authority (`aptitude-server`): publish, exact fetch, discovery candidate retrieval, dependency metadata reads, and governance metadata.
 - Resolution authority (`aptitude-resolver`): prompt interpretation, reranking, final selection, dependency solving, conflict handling, lock generation, execution planning.
 
 Use this rule consistently:
@@ -63,7 +63,7 @@ flowchart TB
 
 Client["Client / MCP / CLI"]
 Resolver["aptitude-resolver\n- Prompt Interpreter\n- Query Builder\n- Reranker + Selector\n- Dependency Solver\n- Lock Builder\n- Plugin Orchestrator"]
-Registry["aptitude-server\n- Publish/Fetch/List APIs\n- Search Candidate Retrieval\n- Governance + Metadata"]
+Registry["aptitude-server\n- Publish/Fetch APIs\n- Search Candidate Retrieval\n- Governance + Metadata"]
 Storage["Persistence\n- PostgreSQL Artifact Payloads\n- PostgreSQL Indexes\n- Audit Log"]
 
 Client --> Resolver
@@ -176,7 +176,7 @@ Goal: each step ends with a complete, testable vertical slice.
 
 - Define artifact + manifest schema.
 - Publish immutable versions.
-- Fetch by `skill_id` + `version`.
+- Fetch by `slug` + `version`.
 
 **Tests**
 

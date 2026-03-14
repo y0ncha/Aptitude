@@ -33,9 +33,9 @@ Example shape:
 
 - `skills`
 - `skill_versions`
-  - `skill_id`
+  - `slug`
   - `version`
-  - `manifest_json`
+  - `metadata_json`
   - `content_text`
   - `sha256_digest`
   - `published_at`
@@ -46,7 +46,7 @@ Example shape:
 - Single transactional boundary for publish
 - No orphaned files or cross-store consistency failures
 - Easy backup, restore, replication, and auditing
-- Exact fetch by `skill_id + version` is cheap for `4-6 KB` payloads
+- Exact fetch by `slug + version` is cheap for `4-6 KB` payloads
 
 ### Cons
 
@@ -69,13 +69,13 @@ Example shape:
 
 - `skills`
 - `skill_versions`
-  - version metadata, lifecycle state, discovery fields
-- `skill_artifacts`
+  - version metadata, lifecycle state, provenance, checksum, `content_fk`
+- `skill_contents`
   - `sha256_digest`
   - `content_text`
   - `size_bytes`
-- `skill_version_artifacts`
-  - binds a version to one artifact digest
+- `skill_metadata`
+  - name, description, tags, structured metadata
 
 ### Pros
 
@@ -165,7 +165,7 @@ This gives the architectural benefit you want, separation between discovery and 
 Recommended design:
 
 - Discovery reads query only metadata and search-indexed columns
-- Exact fetch reads artifact content by `skill_id + version`
+- Exact fetch reads artifact content by `slug + version`
 - Artifact content is stored once per digest in PostgreSQL
 - Version rows bind immutably to one digest
 - `ETag` and checksum are derived from the digest

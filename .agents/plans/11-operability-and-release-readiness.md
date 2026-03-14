@@ -14,12 +14,12 @@ Harden `aptitude-server` for repeatable deployment and reliable operation after 
   - publish
   - `POST /discovery`
   - `GET /resolution/{slug}/{version}`
-  - `POST /fetch/metadata:batch`
-  - `POST /fetch/content:batch`
+  - `GET /skills/{slug}/versions/{version}`
+  - `GET /skills/{slug}/versions/{version}/content`
   - lifecycle and governance paths
 - Add metrics, dashboards, alerts, and SLO instrumentation for the final route set and PostgreSQL-only storage model.
 - Add Docker packaging, startup/run instructions, and CI quality gates.
-- Add runbooks for incidents on publish, discovery, resolution, metadata batch fetch, content batch fetch, lifecycle, and governance operations.
+- Add runbooks for incidents on publish, discovery, resolution, exact metadata fetch, exact content fetch, lifecycle, and governance operations.
 - Keep operability work internal to instrumentation, packaging, and runbooks; do not add new public registry-business endpoints, debug routes, or alternate discovery/resolution/fetch variants.
 - Validate performance and reliability against the finalized API and storage shape from Plans 08-10 rather than against deleted routes or transitional storage semantics.
 
@@ -41,13 +41,13 @@ Harden `aptitude-server` for repeatable deployment and reliable operation after 
 - CI blocks merges on failing quality gates.
 - Containerized startup and migration flow work against the final service shape.
 - Discovery and immutable fetch SLO instrumentation align with the KPIs in `docs/prd.md`.
-- Resolution and content batch fetch reliability instrumentation exist for the final contract.
+- Resolution and exact content fetch reliability instrumentation exist for the final contract.
 - Operability work does not add public business-endpoint variants to support diagnostics or release operations.
 - Runbooks and alerts assume PostgreSQL-only storage and never reference deleted route families or non-PostgreSQL artifact backends.
 
 ## Test Plan
-- End-to-end integration test covering publish -> discovery -> resolution -> metadata batch fetch -> content batch fetch -> lifecycle update.
+- End-to-end integration test covering publish -> discovery -> resolution -> exact metadata fetch -> exact content fetch -> lifecycle update.
 - CI smoke test in a containerized environment.
 - Audit/log correlation test for a complete registry request path.
-- Performance/load validation for discovery, resolution, and batch fetch on the finalized route set.
+- Performance/load validation for discovery, resolution, and exact fetch on the finalized route set.
 - Alerting and metrics sanity test for publish failures, exact-read failures, resolution failures, and discovery latency regression.

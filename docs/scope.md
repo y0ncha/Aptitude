@@ -42,9 +42,9 @@ The client decides what to use and how to compose it.
 
 ## Design Goals
 
-- Keep `GET /skills/search` fast for metadata + description search.
+- Keep `POST /discovery` fast for metadata + description search.
 - Prevent agents from scanning the entire catalog client-side.
-- Preserve immutable, cache-friendly fetches for exact `(skill_id, version)` reads.
+- Preserve immutable, cache-friendly fetches for exact `(slug, version)` reads.
 - Keep prompt interpretation and final selection outside the server so the
   search API remains stable, scalable, and easy to cache.
 - Allow client policy and ranking logic to evolve independently of registry
@@ -111,7 +111,7 @@ primitives. The server does not perform the agent's reasoning or final choice.
 
 ### Exact Fetch and Execution Flow
 
-1. client selects concrete `(skill_id, version)` coordinates.
+1. client selects concrete `(slug, version)` coordinates.
 2. client fetches immutable metadata and artifact identity from the server.
 3. client verifies checksums, expands dependencies, and builds a lock.
 4. client produces the execution plan and trace output.
@@ -190,15 +190,17 @@ This separation is required for speed and scalability.
 
 The server must expose registry-oriented contracts such as:
 
-- `POST /skills/publish`
-- `GET /skills/{id}/{version}`
-- `GET /skills/{id}`
-- `GET /skills/search`
+- `POST /skill-versions`
+- `POST /discovery`
+- `GET /resolution/{slug}/{version}`
+- `GET /skills/{slug}/versions/{version}`
+- `GET /skills/{slug}/versions/{version}/content`
+- `PATCH /skills/{slug}/versions/{version}/status`
 - Optional governance endpoints (`deprecate`, `archive`, `trust/admin`)
 
-`GET /skills/search` should be designed for candidate generation, not final
-decision making. It should accept textual search and structured filters, and it
-should return stable ordering plus ranking explanation hints.
+`POST /discovery` should be designed for candidate generation, not final
+decision making. It should accept structured search input and return stable slug
+ordering without embedding final selection or dependency-solving semantics.
 
 ### client APIs
 

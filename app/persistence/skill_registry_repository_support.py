@@ -17,7 +17,6 @@ from app.core.ports import (
     SkillRegistryPersistenceError,
     StoredRelationshipSelector,
     StoredSkillVersion,
-    StoredSkillVersionSummary,
 )
 from app.persistence.models.skill_relationship_selector import SkillRelationshipSelector
 from app.persistence.models.skill_search_document import SkillSearchDocument
@@ -198,24 +197,6 @@ def to_stored_skill_version(entity: SkillVersion) -> StoredSkillVersion:
             to_stored_selector(selector)
             for selector in sort_relationship_selectors(entity.relationship_selectors)
         ),
-    )
-
-
-def to_stored_skill_version_summary(entity: SkillVersion) -> StoredSkillVersionSummary:
-    """Project one eagerly loaded ORM version into the stored summary model."""
-    return StoredSkillVersionSummary(
-        slug=entity.skill.slug,
-        version=entity.version,
-        version_checksum_digest=entity.checksum_digest,
-        content_checksum_digest=entity.content.checksum_digest,
-        content_size_bytes=entity.content.storage_size_bytes,
-        rendered_summary=entity.content.rendered_summary,
-        name=entity.metadata_row.name,
-        description=entity.metadata_row.description,
-        tags=tuple(entity.metadata_row.tags),
-        lifecycle_status=cast(LifecycleStatus, entity.lifecycle_status),
-        trust_tier=cast(TrustTier, entity.trust_tier),
-        published_at=entity.published_at,
     )
 
 

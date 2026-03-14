@@ -97,34 +97,6 @@ class StoredRelationshipSelector:
 
 
 @dataclass(frozen=True, slots=True)
-class StoredSkillIdentity:
-    """Stored logical skill identity projection."""
-
-    slug: str
-    current_version: str | None
-    created_at: datetime
-    updated_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
-class StoredSkillVersionSummary:
-    """Stored summary projection used by list and relationship reads."""
-
-    slug: str
-    version: str
-    version_checksum_digest: str
-    content_checksum_digest: str
-    content_size_bytes: int
-    rendered_summary: str | None
-    name: str
-    description: str | None
-    tags: tuple[str, ...]
-    lifecycle_status: LifecycleStatus
-    trust_tier: TrustTier
-    published_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
 class StoredSkillVersion:
     """Stored detailed metadata projection for one immutable version."""
 
@@ -233,12 +205,6 @@ class SkillRegistryPort(Protocol):
     def create_version(self, *, record: CreateSkillVersionRecord) -> StoredSkillVersion:
         """Create one immutable normalized version."""
 
-    def get_skill(self, *, slug: str) -> StoredSkillIdentity | None:
-        """Return one logical skill identity, if present."""
-
-    def list_versions(self, *, slug: str) -> tuple[StoredSkillVersionSummary, ...]:
-        """Return deterministic summaries for all versions of a skill."""
-
     def get_version(self, *, slug: str, version: str) -> StoredSkillVersion | None:
         """Return one immutable version for governance-aware updates."""
 
@@ -256,24 +222,15 @@ class SkillVersionReadPort(Protocol):
     """Read-only persistence contract for exact immutable version metadata."""
 
     def get_version(self, *, slug: str, version: str) -> StoredSkillVersion | None:
-        """Return a specific immutable version, if present."""
+        """Return one immutable version for exact read paths."""
 
-    def get_versions_batch(
+    def get_version_content(
         self,
         *,
-        coordinates: tuple[ExactSkillCoordinate, ...],
-    ) -> tuple[StoredSkillVersion, ...]:
-        """Return stored immutable versions for the requested coordinates."""
-
-    def get_version_content(self, *, slug: str, version: str) -> StoredSkillVersionContent | None:
-        """Return raw markdown content for one immutable version, if present."""
-
-    def get_version_contents_batch(
-        self,
-        *,
-        coordinates: tuple[ExactSkillCoordinate, ...],
-    ) -> tuple[StoredSkillVersionContent, ...]:
-        """Return raw markdown content rows for exact immutable version coordinates."""
+        slug: str,
+        version: str,
+    ) -> StoredSkillVersionContent | None:
+        """Return one raw markdown content row for an exact immutable version."""
 
 
 class SkillSearchPort(Protocol):

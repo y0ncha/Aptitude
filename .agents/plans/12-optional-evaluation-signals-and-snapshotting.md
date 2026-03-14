@@ -17,10 +17,10 @@ This milestone is post-launch and optional. It is not part of MVP readiness, rea
 - Keep evaluation outputs limited to mutable derived metadata used for advisory retrieval and ranking support.
 - Treat catalog snapshots as deferred and trigger-based, not as a default roadmap commitment.
 - If evaluation signals are exposed, add them inside the existing `POST /discovery` request or response shape rather than by creating new public discovery route families.
-- If snapshotting is justified, represent snapshot selection within the existing discovery or batch-fetch contract by default instead of creating separate public snapshot route trees.
+- If snapshotting is justified, represent snapshot selection within the existing discovery or exact-fetch contract by default instead of creating separate public snapshot route trees.
 - Keep all evaluation and snapshot work separate from canonical dependency declarations, immutable metadata/content fetch, and digest-backed content storage.
 - Preserve the hard server/client boundary: no server-side solving, final candidate selection, lock generation, or execution planning.
-- Do not reintroduce deleted route families or alternate single-item fetch surfaces as part of this optional work.
+- Do not reintroduce deleted route families or alternate batch-fetch surfaces as part of this optional work.
 
 ## Trigger Criteria
 - Discovery quality issues cannot be addressed with the existing slug-only candidate baseline and deterministic base ranking alone.
@@ -30,7 +30,7 @@ This milestone is post-launch and optional. It is not part of MVP readiness, rea
 ## Architecture Impact
 - Keeps future discovery enhancements decoupled from core registry correctness.
 - Prevents speculative features from turning into MVP obligations.
-- Protects resolution and batch fetch semantics from being entangled with mutable derived metadata.
+- Protects resolution and exact fetch semantics from being entangled with mutable derived metadata.
 
 ## Deliverables
 - Derived evaluation run model and result storage only if trigger criteria are met.
@@ -41,9 +41,9 @@ This milestone is post-launch and optional. It is not part of MVP readiness, rea
 ## Acceptance Criteria
 - If implemented, evaluation updates derived metadata only and never mutates immutable version identity, dependency declarations, metadata snapshots, or content payloads.
 - Snapshot APIs are not added unless one or more trigger criteria are explicitly satisfied.
-- Resolution and batch fetch remain independent of evaluation state and snapshot state.
+- Resolution and exact fetch remain independent of evaluation state and snapshot state.
 - The milestone remains clearly marked optional and post-launch in roadmap and plan language.
-- No part of the plan reintroduces deleted route families, single-item fetch, or server-side solving semantics.
+- No part of the plan reintroduces deleted route families, batch fetch, or server-side solving semantics.
 - Optional discovery work keeps the public endpoint surface simple and does not create new public route families when existing requests can carry the needed state.
 
 ## Test Plan

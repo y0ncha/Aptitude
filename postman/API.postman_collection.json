@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "42b033f2-7052-4646-b611-ce0d542f1f9a",
     "name": "API",
-    "description": "Collection for validating the current Aptitude Skills API.\n\n  - Sanity: covers authenticated publish, lifecycle updates, batch fetch, discovery, and resolution\n  - Negative: covers authenticated validation, duplicate, not-found, and batch not_found responses\n\nNote: `/readyz` exposes a 503 branch only when the runtime is unhealthy, so the collection\nasserts the healthy `200 ready` path by default.\n\nAll business endpoints require `Authorization: Bearer <token>`. The default token variables\nmatch the local development `AUTH_TOKENS_JSON` example from the README.",
+    "description": "Collection for validating the current Aptitude Skills API.\n\n  - Sanity: covers authenticated publish, lifecycle updates, exact fetch, discovery, and resolution\n  - Negative: covers authenticated validation, duplicate, exact-fetch errors, and resolution errors\n\nNote: `/readyz` exposes a 503 branch only when the runtime is unhealthy, so the collection\nasserts the healthy `200 ready` path by default.\n\nAll business endpoints require `Authorization: Bearer <token>`. The default token variables\nmatch the local development `AUTH_TOKENS_JSON` example from the README.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -95,7 +95,7 @@
   "item": [
     {
       "name": "Sanity",
-      "description": "Happy-path requests for the Aptitude Skills API.\n\nExpected run order:\n  1. Healthz\n  2. Readyz\n  3. Publish Dependency Skill\n  4. Publish Extension Skill\n  5. Publish Overlap Skill\n  6. Publish Skill v1\n  7. Publish Skill v2\n  8. Update Skill Version Status\n  9. Batch Fetch Published Skill Metadata\n  10. Batch Fetch Published Skill Content\n  11. Discover Published Skill Candidates\n  12. Resolve Published Skill Dependencies",
+      "description": "Happy-path requests for the Aptitude Skills API.\n\nExpected run order:\n  1. Healthz\n  2. Readyz\n  3. Publish Dependency Skill\n  4. Publish Extension Skill\n  5. Publish Overlap Skill\n  6. Publish Skill v1\n  7. Publish Skill v2\n  8. Update Skill Version Status\n  9. Fetch Published Skill Metadata\n  10. Fetch Published Skill Content\n  11. Discover Published Skill Candidates\n  12. Resolve Published Skill Dependencies",
       "item": [
         {
           "name": "Healthz",
@@ -791,7 +791,7 @@
                   "});",
                   "",
                   "pm.execution.setNextRequest(",
-                  "  pm.response.code === 200 ? 'Batch Fetch Published Skill Metadata' : null,",
+                  "  pm.response.code === 200 ? 'Fetch Published Skill Metadata' : null,",
                   ");"
                 ]
               }
@@ -887,19 +887,14 @@
           ]
         },
         {
-          "name": "Batch Fetch Published Skill Metadata",
+          "name": "Fetch Published Skill Metadata",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "Accept",
                 "value": "application/json",
-                "description": "Request immutable metadata in batch request order"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "Send the exact coordinate batch body"
+                "description": "Request immutable metadata for one exact coordinate"
               },
               {
                 "key": "Authorization",
@@ -907,16 +902,7 @@
                 "description": "Authenticate with a caller that has the `read` scope"
               }
             ],
-            "url": "{{baseUrl}}/fetch/metadata:batch",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+            "url": "{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}"
           },
           "event": [
             {
@@ -925,35 +911,28 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "const [found, missing] = json.results;",
                   "",
                   "pm.test('Status is 200', () => {",
                   "  pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test('Metadata batch returns ordered found and not_found results', () => {",
-                  "  pm.expect(json.results).to.have.length(2);",
-                  "  pm.expect(found.status).to.eql('found');",
-                  "  pm.expect(found.coordinate.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
-                  "  pm.expect(found.coordinate.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
-                  "  pm.expect(found.item.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
-                  "  pm.expect(found.item.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
-                  "  pm.expect(found.item.metadata.name).to.eql('Postman Primary Skill');",
-                  "  pm.expect(found.item.lifecycle_status).to.eql('deprecated');",
-                  "  pm.expect(found.item.trust_tier).to.eql('untrusted');",
-                  "  pm.expect(found.item).to.not.have.property('relationships');",
-                  "  pm.expect(found.item).to.not.have.property('content_download_path');",
-                  "",
-                  "  pm.expect(missing.status).to.eql('not_found');",
-                  "  pm.expect(missing.coordinate.slug).to.eql(pm.collectionVariables.get('negative_missing_slug'));",
-                  "  pm.expect(missing.coordinate.version).to.eql(",
-                  "    pm.collectionVariables.get('negative_missing_version'),",
-                  "  );",
-                  "  pm.expect(missing.item).to.eql(null);",
+                  "pm.test('Exact metadata fetch returns the immutable metadata envelope', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
+                  "  pm.expect(json.metadata.name).to.eql('Postman Primary Skill');",
+                  "  pm.expect(json.content.rendered_summary).to.eql('Postman primary skill version 2.');",
+                  "  pm.expect(json.content.checksum.algorithm).to.eql('sha256');",
+                  "  pm.expect(json.content.checksum.digest).to.be.a('string').and.not.empty;",
+                  "  pm.expect(json.lifecycle_status).to.eql('deprecated');",
+                  "  pm.expect(json.trust_tier).to.eql('untrusted');",
+                  "  pm.expect(json).to.not.have.property('relationships');",
+                  "  pm.expect(json).to.not.have.property('content_download_path');",
                   "});",
                   "",
+                  "pm.collectionVariables.set('sanity_primary_content_digest', json.content.checksum.digest);",
+                  "",
                   "pm.execution.setNextRequest(",
-                  "  pm.response.code === 200 ? 'Batch Fetch Published Skill Content' : null,",
+                  "  pm.response.code === 200 ? 'Fetch Published Skill Content' : null,",
                   ");"
                 ]
               }
@@ -961,19 +940,14 @@
           ],
           "response": [
             {
-              "name": "Found And Missing (200)",
+              "name": "Exact Metadata (200)",
               "originalRequest": {
-                "method": "POST",
+                "method": "GET",
                 "header": [
                   {
                     "key": "Accept",
                     "value": "application/json",
-                    "description": "Request immutable metadata in batch request order"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "description": "Send the exact coordinate batch body"
+                    "description": "Request immutable metadata for one exact coordinate"
                   },
                   {
                     "key": "Authorization",
@@ -981,16 +955,7 @@
                     "description": "Authenticate with a caller that has the `read` scope"
                   }
                 ],
-                "url": "{{baseUrl}}/fetch/metadata:batch",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
+                "url": "{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}"
               },
               "status": "OK",
               "code": 200,
@@ -1001,24 +966,19 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"results\": [\n    {\n      \"status\": \"found\",\n      \"coordinate\": {\n        \"slug\": \"python.primary\",\n        \"version\": \"2.0.0\"\n      },\n      \"item\": {\n        \"slug\": \"python.primary\",\n        \"version\": \"2.0.0\",\n        \"version_checksum\": {\n          \"algorithm\": \"sha256\",\n          \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n        },\n        \"content\": {\n          \"checksum\": {\n            \"algorithm\": \"sha256\",\n            \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n          },\n          \"size_bytes\": 123,\n          \"rendered_summary\": \"Lint Python files consistently.\"\n        },\n        \"metadata\": {\n          \"name\": \"Python Lint\",\n          \"description\": \"Linting skill\",\n          \"tags\": [\n            \"python\",\n            \"lint\"\n          ],\n          \"headers\": {\n            \"runtime\": \"python\"\n          },\n          \"inputs_schema\": {\n            \"type\": \"object\"\n          },\n          \"outputs_schema\": {\n            \"type\": \"object\"\n          },\n          \"token_estimate\": 128,\n          \"maturity_score\": 0.9,\n          \"security_score\": 0.95\n        },\n        \"lifecycle_status\": \"deprecated\",\n        \"trust_tier\": \"untrusted\",\n        \"published_at\": \"2026-03-10T08:30:00Z\"\n      }\n    },\n    {\n      \"status\": \"not_found\",\n      \"coordinate\": {\n        \"slug\": \"python.missing\",\n        \"version\": \"9.9.9\"\n      },\n      \"item\": null\n    }\n  ]\n}"
+              "body": "{\n  \"slug\": \"python.primary\",\n  \"version\": \"2.0.0\",\n  \"version_checksum\": {\n    \"algorithm\": \"sha256\",\n    \"digest\": \"bbbb8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n  },\n  \"content\": {\n    \"checksum\": {\n      \"algorithm\": \"sha256\",\n      \"digest\": \"aaaa8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n    },\n    \"size_bytes\": 108,\n    \"rendered_summary\": \"Postman primary skill version 2.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Primary Skill\",\n    \"description\": \"Primary sanity skill for collection coverage\",\n    \"tags\": [\n      \"postman\",\n      \"sanity\",\n      \"primary\"\n    ],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 260,\n    \"maturity_score\": 0.92,\n    \"security_score\": 0.97\n  },\n  \"lifecycle_status\": \"deprecated\",\n  \"trust_tier\": \"untrusted\",\n  \"published_at\": \"2026-03-10T08:30:00Z\"\n}"
             }
           ]
         },
         {
-          "name": "Batch Fetch Published Skill Content",
+          "name": "Fetch Published Skill Content",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "Accept",
-                "value": "multipart/mixed",
-                "description": "Request immutable markdown content as multipart"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "Send the exact coordinate batch body"
+                "value": "text/markdown",
+                "description": "Request immutable markdown content for one exact coordinate"
               },
               {
                 "key": "Authorization",
@@ -1026,16 +986,7 @@
                 "description": "Authenticate with a caller that has the `read` scope"
               }
             ],
-            "url": "{{baseUrl}}/fetch/content:batch",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+            "url": "{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}/content"
           },
           "event": [
             {
@@ -1044,23 +995,24 @@
                 "type": "text/javascript",
                 "exec": [
                   "const body = pm.response.text();",
+                  "const runId = pm.collectionVariables.get('runId');",
+                  "const expected = `# Postman Primary Skill v2",
+                  "",
+                  "Run \\`${runId}\\` primary skill version 2 with a larger body for discovery and content checks.",
+                  "`;",
                   "",
                   "pm.test('Status is 200', () => {",
                   "  pm.response.to.have.status(200);",
                   "});",
                   "",
-                  "pm.test('Content batch returns multipart content with found and not_found parts', () => {",
-                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('multipart/mixed');",
-                  "  pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('sanity_primary_slug')}`);",
-                  "  pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('sanity_version_2')}`);",
-                  "  pm.expect(body).to.include('X-Aptitude-Status: found');",
-                  "  pm.expect(body).to.include('Cache-Control: public, immutable');",
-                  "  pm.expect(body).to.include('ETag:');",
-                  "  pm.expect(body).to.include('Postman Primary Skill v2');",
-                  "  pm.expect(body).to.include(pm.collectionVariables.get('runId'));",
-                  "  pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('negative_missing_slug')}`);",
-                  "  pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('negative_missing_version')}`);",
-                  "  pm.expect(body).to.include('X-Aptitude-Status: not_found');",
+                  "pm.test('Exact content fetch returns immutable markdown with cache headers', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/markdown; charset=utf-8');",
+                  "  pm.expect(pm.response.headers.get('Cache-Control')).to.eql('public, immutable');",
+                  "  pm.expect(pm.response.headers.get('ETag')).to.eql(",
+                  "    pm.collectionVariables.get('sanity_primary_content_digest'),",
+                  "  );",
+                  "  pm.expect(pm.response.headers.get('Content-Length')).to.eql(String(expected.length));",
+                  "  pm.expect(body).to.eql(expected);",
                   "});",
                   "",
                   "pm.execution.setNextRequest(",
@@ -1072,19 +1024,14 @@
           ],
           "response": [
             {
-              "name": "Multipart Found And Missing (200)",
+              "name": "Exact Content (200)",
               "originalRequest": {
-                "method": "POST",
+                "method": "GET",
                 "header": [
                   {
                     "key": "Accept",
-                    "value": "multipart/mixed",
-                    "description": "Request immutable markdown content as multipart"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "description": "Send the exact coordinate batch body"
+                    "value": "text/markdown",
+                    "description": "Request immutable markdown content for one exact coordinate"
                   },
                   {
                     "key": "Authorization",
@@ -1092,16 +1039,7 @@
                     "description": "Authenticate with a caller that has the `read` scope"
                   }
                 ],
-                "url": "{{baseUrl}}/fetch/content:batch",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
+                "url": "{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}/content"
               },
               "status": "OK",
               "code": 200,
@@ -1109,10 +1047,22 @@
               "header": [
                 {
                   "key": "Content-Type",
-                  "value": "multipart/mixed; boundary=aptitude-example"
+                  "value": "text/markdown; charset=utf-8"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "public, immutable"
+                },
+                {
+                  "key": "ETag",
+                  "value": "aaaa8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "117"
                 }
               ],
-              "body": "--aptitude-example\r\nContent-Type: text/markdown; charset=utf-8\r\nX-Aptitude-Slug: python.primary\r\nX-Aptitude-Version: 2.0.0\r\nX-Aptitude-Status: found\r\nETag: c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\r\nCache-Control: public, immutable\r\nContent-Length: 39\r\n\r\n# Python Lint\n\nLint Python files consistently.\n\r\n--aptitude-example\r\nContent-Type: text/markdown; charset=utf-8\r\nX-Aptitude-Slug: python.missing\r\nX-Aptitude-Version: 9.9.9\r\nX-Aptitude-Status: not_found\r\n\r\n--aptitude-example--\r\n"
+              "body": "# Postman Primary Skill v2\n\nRun `12345` primary skill version 2 with a larger body for discovery and content checks.\n"
             }
           ]
         },
@@ -1557,7 +1507,7 @@
                   "});",
                   "",
                   "pm.execution.setNextRequest(",
-                  "  pm.response.code === 409 ? 'Batch Fetch Missing Skill Metadata' : null,",
+                  "  pm.response.code === 409 ? 'Fetch Missing Skill Metadata' : null,",
                   ");"
                 ]
               }
@@ -1610,19 +1560,14 @@
           ]
         },
         {
-          "name": "Batch Fetch Missing Skill Metadata",
+          "name": "Fetch Missing Skill Metadata",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "Accept",
                 "value": "application/json",
-                "description": "Expect an ordered not_found result for an unknown coordinate"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "Send a valid metadata batch request body"
+                "description": "Expect a normalized not-found response for an unknown exact metadata coordinate"
               },
               {
                 "key": "Authorization",
@@ -1630,16 +1575,7 @@
                 "description": "Authenticate with a caller that has the `read` scope"
               }
             ],
-            "url": "{{baseUrl}}/fetch/metadata:batch",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+            "url": "{{baseUrl}}/skills/{{negative_missing_slug}}/versions/{{negative_missing_version}}"
           },
           "event": [
             {
@@ -1648,23 +1584,21 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "const result = json.results[0];",
                   "",
-                  "pm.test('Status is 200', () => {",
-                  "  pm.response.to.have.status(200);",
+                  "pm.test('Status is 404', () => {",
+                  "  pm.response.to.have.status(404);",
                   "});",
                   "",
-                  "pm.test('Unknown coordinate returns a not_found metadata batch item', () => {",
-                  "  pm.expect(result.status).to.eql('not_found');",
-                  "  pm.expect(result.coordinate.slug).to.eql(pm.collectionVariables.get('negative_missing_slug'));",
-                  "  pm.expect(result.coordinate.version).to.eql(",
+                  "pm.test('Unknown exact metadata coordinate returns the normalized API error envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('SKILL_VERSION_NOT_FOUND');",
+                  "  pm.expect(json.error.details.slug).to.eql(pm.collectionVariables.get('negative_missing_slug'));",
+                  "  pm.expect(json.error.details.version).to.eql(",
                   "    pm.collectionVariables.get('negative_missing_version'),",
                   "  );",
-                  "  pm.expect(result.item).to.eql(null);",
                   "});",
                   "",
                   "pm.execution.setNextRequest(",
-                  "  pm.response.code === 200 ? 'Batch Fetch Invalid Metadata Request' : null,",
+                  "  pm.response.code === 404 ? 'Fetch Invalid Metadata Version' : null,",
                   ");"
                 ]
               }
@@ -1672,19 +1606,14 @@
           ],
           "response": [
             {
-              "name": "Not Found Result (200)",
+              "name": "Not Found (404)",
               "originalRequest": {
-                "method": "POST",
+                "method": "GET",
                 "header": [
                   {
                     "key": "Accept",
                     "value": "application/json",
-                    "description": "Expect an ordered not_found result for an unknown coordinate"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "description": "Send a valid metadata batch request body"
+                    "description": "Expect a normalized not-found response for an unknown exact metadata coordinate"
                   },
                   {
                     "key": "Authorization",
@@ -1692,19 +1621,10 @@
                     "description": "Authenticate with a caller that has the `read` scope"
                   }
                 ],
-                "url": "{{baseUrl}}/fetch/metadata:batch",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
+                "url": "{{baseUrl}}/skills/{{negative_missing_slug}}/versions/{{negative_missing_version}}"
               },
-              "status": "OK",
-              "code": 200,
+              "status": "Not Found",
+              "code": 404,
               "_postman_previewlanguage": "json",
               "header": [
                 {
@@ -1712,24 +1632,19 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"results\": [\n    {\n      \"status\": \"not_found\",\n      \"coordinate\": {\n        \"slug\": \"python.missing\",\n        \"version\": \"9.9.9\"\n      },\n      \"item\": null\n    }\n  ]\n}"
+              "body": "{\n  \"error\": {\n    \"code\": \"SKILL_VERSION_NOT_FOUND\",\n    \"message\": \"Skill version not found: python.missing@9.9.9\",\n    \"details\": {\n      \"slug\": \"python.missing\",\n      \"version\": \"9.9.9\"\n    }\n  }\n}"
             }
           ]
         },
         {
-          "name": "Batch Fetch Invalid Metadata Request",
+          "name": "Fetch Invalid Metadata Version",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "Accept",
                 "value": "application/json",
-                "description": "Expect request validation to reject the invalid semantic version in the body"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "Send an invalid metadata batch request body"
+                "description": "Expect request validation to reject the invalid semantic version in the path"
               },
               {
                 "key": "Authorization",
@@ -1737,16 +1652,7 @@
                 "description": "Authenticate with a caller that has the `read` scope"
               }
             ],
-            "url": "{{baseUrl}}/fetch/metadata:batch",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{invalid_version}}\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+            "url": "{{baseUrl}}/skills/{{negative_missing_slug}}/versions/{{invalid_version}}"
           },
           "event": [
             {
@@ -1760,21 +1666,20 @@
                   "  pm.response.to.have.status(422);",
                   "});",
                   "",
-                  "pm.test('Invalid metadata batch returns the normalized validation envelope', () => {",
+                  "pm.test('Invalid exact metadata version returns the normalized validation envelope', () => {",
                   "  pm.expect(json.error.code).to.eql('INVALID_REQUEST');",
                   "  pm.expect(",
                   "    json.error.details.errors.some(",
                   "      (item) =>",
                   "        Array.isArray(item.loc) &&",
-                  "        item.loc.includes('body') &&",
-                  "        item.loc.includes('coordinates') &&",
+                  "        item.loc.includes('path') &&",
                   "        item.loc.includes('version'),",
                   "    ),",
                   "  ).to.eql(true);",
                   "});",
                   "",
                   "pm.execution.setNextRequest(",
-                  "  pm.response.code === 422 ? 'Batch Fetch Missing Skill Content' : null,",
+                  "  pm.response.code === 422 ? 'Fetch Missing Skill Content' : null,",
                   ");"
                 ]
               }
@@ -1784,17 +1689,12 @@
             {
               "name": "Invalid Request (422)",
               "originalRequest": {
-                "method": "POST",
+                "method": "GET",
                 "header": [
                   {
                     "key": "Accept",
                     "value": "application/json",
-                    "description": "Expect request validation to reject the invalid semantic version in the body"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "description": "Send an invalid metadata batch request body"
+                    "description": "Expect request validation to reject the invalid semantic version in the path"
                   },
                   {
                     "key": "Authorization",
@@ -1802,16 +1702,7 @@
                     "description": "Authenticate with a caller that has the `read` scope"
                   }
                 ],
-                "url": "{{baseUrl}}/fetch/metadata:batch",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{invalid_version}}\"\n    }\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
+                "url": "{{baseUrl}}/skills/{{negative_missing_slug}}/versions/{{invalid_version}}"
               },
               "status": "Unprocessable Content",
               "code": 422,
@@ -1822,24 +1713,19 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"error\": {\n    \"code\": \"INVALID_REQUEST\",\n    \"message\": \"Request validation failed.\",\n    \"details\": {\n      \"errors\": [\n        {\n          \"type\": \"string_pattern_mismatch\",\n          \"loc\": [\n            \"path\",\n            \"version\"\n          ],\n          \"msg\": \"String should match pattern\",\n          \"input\": \"latest\"\n        }\n      ]\n    }\n  }\n}"
+              "body": "{\n  \"error\": {\n    \"code\": \"INVALID_REQUEST\",\n    \"message\": \"Request validation failed.\",\n    \"details\": {\n      \"errors\": [\n        {\n          \"type\": \"string_pattern_mismatch\",\n          \"loc\": [\n            \"path\",\n            \"version\"\n          ],\n          \"msg\": \"String should match pattern\",\n          \"input\": \"not-a-semver\"\n        }\n      ]\n    }\n  }\n}"
             }
           ]
         },
         {
-          "name": "Batch Fetch Missing Skill Content",
+          "name": "Fetch Missing Skill Content",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "header": [
               {
                 "key": "Accept",
-                "value": "multipart/mixed",
-                "description": "Expect multipart content with a not_found part for the missing coordinate"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "Send a valid content batch request body"
+                "value": "text/markdown",
+                "description": "Expect a normalized not-found response for an unknown exact content coordinate"
               },
               {
                 "key": "Authorization",
@@ -1847,16 +1733,7 @@
                 "description": "Authenticate with a caller that has the `read` scope"
               }
             ],
-            "url": "{{baseUrl}}/fetch/content:batch",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
+            "url": "{{baseUrl}}/skills/{{negative_missing_slug}}/versions/{{negative_missing_version}}/content"
           },
           "event": [
             {
@@ -1864,39 +1741,35 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const body = pm.response.text();",
+                  "const json = pm.response.json();",
                   "",
-                  "pm.test('Status is 200', () => {",
-                  "  pm.response.to.have.status(200);",
+                  "pm.test('Status is 404', () => {",
+                  "  pm.response.to.have.status(404);",
                   "});",
                   "",
-                  "pm.test('Missing content batch returns a multipart not_found part', () => {",
-                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('multipart/mixed');",
-                  "  pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('negative_missing_slug')}`);",
-                  "  pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('negative_missing_version')}`);",
-                  "  pm.expect(body).to.include('X-Aptitude-Status: not_found');",
+                  "pm.test('Unknown exact content coordinate returns the normalized API error envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('SKILL_VERSION_NOT_FOUND');",
+                  "  pm.expect(json.error.details.slug).to.eql(pm.collectionVariables.get('negative_missing_slug'));",
+                  "  pm.expect(json.error.details.version).to.eql(",
+                  "    pm.collectionVariables.get('negative_missing_version'),",
+                  "  );",
                   "});",
                   "",
-                  "pm.execution.setNextRequest(pm.response.code === 200 ? 'Discover Without Name' : null);"
+                  "pm.execution.setNextRequest(pm.response.code === 404 ? 'Discover Without Name' : null);"
                 ]
               }
             }
           ],
           "response": [
             {
-              "name": "Multipart Not Found (200)",
+              "name": "Not Found (404)",
               "originalRequest": {
-                "method": "POST",
+                "method": "GET",
                 "header": [
                   {
                     "key": "Accept",
-                    "value": "multipart/mixed",
-                    "description": "Expect multipart content with a not_found part for the missing coordinate"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json",
-                    "description": "Send a valid content batch request body"
+                    "value": "text/markdown",
+                    "description": "Expect a normalized not-found response for an unknown exact content coordinate"
                   },
                   {
                     "key": "Authorization",
@@ -1904,27 +1777,18 @@
                     "description": "Authenticate with a caller that has the `read` scope"
                   }
                 ],
-                "url": "{{baseUrl}}/fetch/content:batch",
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                }
+                "url": "{{baseUrl}}/skills/{{negative_missing_slug}}/versions/{{negative_missing_version}}/content"
               },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "text",
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
               "header": [
                 {
                   "key": "Content-Type",
-                  "value": "multipart/mixed; boundary=aptitude-example"
+                  "value": "application/json"
                 }
               ],
-              "body": "--aptitude-example\r\nContent-Type: text/markdown; charset=utf-8\r\nX-Aptitude-Slug: python.missing\r\nX-Aptitude-Version: 9.9.9\r\nX-Aptitude-Status: not_found\r\n\r\n--aptitude-example--\r\n"
+              "body": "{\n  \"error\": {\n    \"code\": \"SKILL_VERSION_NOT_FOUND\",\n    \"message\": \"Skill version not found: python.missing@9.9.9\",\n    \"details\": {\n      \"slug\": \"python.missing\",\n      \"version\": \"9.9.9\"\n    }\n  }\n}"
             }
           ]
         },

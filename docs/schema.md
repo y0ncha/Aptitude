@@ -13,12 +13,11 @@ It reflects the direction implied by the current plans:
 
 ## Current Review
 The live schema is a single canonical PostgreSQL baseline around content,
-metadata, relationship selectors, dependencies, and governance state.
+metadata, relationship selectors, and governance state.
 
-- `skills` stores only the logical identity row plus the current default version pointer
+- `skills` stores only the logical identity row
 - `skill_versions` binds immutable content and metadata to a version-scoped lifecycle/trust policy state
-- authored selectors live in `skill_relationship_selectors`
-- exact resolved version-to-version edges live in `skill_dependencies`
+- authored selectors live in `skill_relationship_selectors` and remain the exact dependency source of truth
 - discovery uses `skill_search_documents` as a derived, governance-aware read model
 
 ## Design Principles
@@ -47,8 +46,7 @@ erDiagram
     skills ||--o{ skill_versions : has
     skill_contents ||--o{ skill_versions : backs
     skill_metadata ||--o{ skill_versions : describes
-    skill_versions ||--o{ skill_dependencies : source
-    skill_versions ||--o{ skill_dependencies : target
+    skill_versions ||--o{ skill_relationship_selectors : preserves
     skill_versions ||--|| skill_search_documents : projects
 ```
 
@@ -61,14 +59,12 @@ Stable identity row.
 | --- | --- | --- | --- |
 | `id` | `bigint` | PK | Internal identity key |
 | `slug` | `text` | `NOT NULL`, unique | Stable public skill identifier |
-| `current_version_id` | `bigint` | nullable FK -> `skill_versions.id` | Mutable pointer to the highest visible non-archived default version |
 | `created_at` | `timestamptz` | `NOT NULL` | Row creation time |
 | `updated_at` | `timestamptz` | `NOT NULL` | Last identity-state update |
 
 Recommended constraints and indexes:
 
 - unique index on `slug`
-- repository-level invariant that `current_version_id`, when present, belongs to the same skill
 
 ### `skill_versions`
 Immutable version rows binding identity, content, and metadata together.
@@ -101,7 +97,7 @@ Immutability rule:
 
 - lifecycle and trust are version-scoped governance state
 - any body or metadata change creates a new `skill_versions` row
-- `archived` rows are never eligible for `skills.current_version_id`
+- default-version selection is derived from canonical version ordering when needed and is not stored on `skills`
 
 ### `skill_contents`
 Authoritative markdown body storage.
@@ -147,28 +143,25 @@ Modeling rule:
 - use typed columns first for fields frequently filtered or sorted
 - keep `jsonb` for evolving structures, not as the main metadata dump
 
-### `skill_dependencies`
-Graph edges between immutable versions.
+### `skill_relationship_selectors`
+Authored relationship selectors preserved exactly as published.
 
 | Column | Type | Constraints | Purpose |
 | --- | --- | --- | --- |
-| `id` | `bigint` | PK | Internal edge key |
-| `from_version_fk` | `bigint` | `NOT NULL`, FK -> `skill_versions.id` | Source version |
-| `to_version_fk` | `bigint` | `NOT NULL`, FK -> `skill_versions.id` | Target version |
-| `constraint_type` | `text` | `NOT NULL` | `depends_on`, `extends`, `conflicts_with`, `overlaps_with` |
-| `version_constraint` | `text` | nullable | Original authored selector text |
+| `id` | `bigint` | PK | Internal selector key |
+| `source_skill_version_fk` | `bigint` | `NOT NULL`, FK -> `skill_versions.id` | Source immutable version |
+| `edge_type` | `text` | `NOT NULL` | `depends_on`, `extends`, `conflicts_with`, `overlaps_with` |
+| `ordinal` | `integer` | `NOT NULL` | Publish-order position within one edge family |
+| `target_slug` | `text` | `NOT NULL` | Authored dependency target slug |
+| `target_version` | `text` | nullable | Authored exact version selector |
+| `version_constraint` | `text` | nullable | Authored version range selector |
+| `optional` | `boolean` | nullable | Optional execution hint for `depends_on` |
+| `markers` | `text[]` | `NOT NULL` | Authored environment/runtime markers |
 
 Recommended constraints and indexes:
 
-- unique constraint on `(from_version_fk, to_version_fk, constraint_type)`
-- index on `from_version_fk`
-- index on `to_version_fk`
-- check constraint restricting `constraint_type` to the supported set
-
-Important note:
-
-- this table assumes graph edges resolve to concrete immutable versions
-- if the product must preserve selector-only dependencies before resolution, add one extra target identity field or a small side table instead of collapsing that information back into `jsonb`
+- index on `(source_skill_version_fk, edge_type, ordinal)`
+- check constraint restricting `edge_type` to the supported set
 
 ### `skill_search_documents`
 Derived read model for fast advisory search.
@@ -212,10 +205,8 @@ The schema is intentionally optimized around two read paths.
 
 Discovery path:
 
-- hit `skills`
-- hit `skill_versions`
-- hit `skill_metadata`
-- optionally hit `skill_search_documents`
+- hit `skill_search_documents`
+- rely on canonical `skills`, `skill_versions`, `skill_metadata`, and `skill_contents` only through the derived projection refresh path
 - do not hit `skill_contents`
 
 Exact fetch path:
@@ -230,10 +221,9 @@ The schema is rebaselined as one canonical Alembic migration:
 1. `0001_initial_schema` creates the full normalized schema directly.
 2. `skill_contents` and `skill_metadata` are canonical.
 3. `skill_relationship_selectors` preserves authored selectors.
-4. `skill_dependencies` stores exact resolved version edges.
-5. `skill_versions` carries version-scoped lifecycle, trust, and provenance.
-6. `skill_search_documents` stores lifecycle/trust for governance-aware discovery.
-7. Historical upgrade-from-legacy paths are intentionally unsupported.
+4. `skill_versions` carries version-scoped lifecycle, trust, and provenance.
+5. `skill_search_documents` stores lifecycle/trust for governance-aware discovery.
+6. Historical upgrade-from-legacy paths are intentionally unsupported.
 
 ## Non-Goals
 - storing markdown in `jsonb`

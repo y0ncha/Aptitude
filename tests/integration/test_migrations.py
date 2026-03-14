@@ -27,8 +27,8 @@ def test_migrations_upgrade_and_downgrade(clean_integration_database: str) -> No
         assert "skill_contents" in inspector.get_table_names()
         assert "skill_metadata" in inspector.get_table_names()
         assert "skill_relationship_selectors" in inspector.get_table_names()
-        assert "skill_dependencies" in inspector.get_table_names()
         assert "skill_search_documents" in inspector.get_table_names()
+        assert "skill_dependencies" not in inspector.get_table_names()
         assert "skill_relationship_edges" not in inspector.get_table_names()
         assert "skill_version_checksums" not in inspector.get_table_names()
 
@@ -38,7 +38,8 @@ def test_migrations_upgrade_and_downgrade(clean_integration_database: str) -> No
             column["name"] for column in inspector.get_columns("skill_search_documents")
         }
 
-        assert {"slug", "current_version_id", "created_at", "updated_at"} <= skill_columns
+        assert {"slug", "created_at", "updated_at"} <= skill_columns
+        assert "current_version_id" not in skill_columns
 
         assert {
             "lifecycle_status",
@@ -64,7 +65,6 @@ def test_migrations_upgrade_and_downgrade(clean_integration_database: str) -> No
         assert "skill_contents" not in inspector.get_table_names()
         assert "skill_metadata" not in inspector.get_table_names()
         assert "skill_relationship_selectors" not in inspector.get_table_names()
-        assert "skill_dependencies" not in inspector.get_table_names()
         assert "skill_search_documents" not in inspector.get_table_names()
     finally:
         downgraded_engine.dispose()

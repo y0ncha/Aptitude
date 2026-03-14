@@ -15,9 +15,9 @@ Deliver a production-ready, PyPI-like immutable registry service (`aptitude-serv
 
 ## Boundary Guardrails
 - This roadmap covers `aptitude-server` only.
-- Server owns data-local registry work: publish, discovery candidate generation, exact first-degree dependency reads, immutable metadata batch fetch, immutable content batch fetch, lifecycle enforcement, provenance capture, and audit.
+- Server owns data-local registry work: publish, discovery candidate generation, exact first-degree dependency reads, exact immutable metadata fetch, exact immutable content fetch, lifecycle enforcement, provenance capture, and audit.
 - Resolver owns decision-local work: MCP/CLI prompt interfaces, prompt interpretation, reranking, final candidate selection, recursive dependency solving, lock generation, plugin orchestration, and execution planning.
-- Server remains execution-agnostic and exposes governed APIs for publish, discovery, resolution, batch fetch, lifecycle, and provenance.
+- Server remains execution-agnostic and exposes governed APIs for publish, discovery, resolution, exact fetch, lifecycle, and provenance.
 - Server contracts are slug candidates, authored direct dependency declarations, immutable metadata/content envelopes, and governance results; the server does not return canonical solved bundles.
 - Discovery remains candidate generation only; resolution remains exact first-degree dependency retrieval only; resolver choice and lock output remain authoritative.
 

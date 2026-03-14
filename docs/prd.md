@@ -6,7 +6,7 @@
 - **Proposed Solution**: Define `aptitude-server` as a package-registry-style service responsible for publish, fetch, list, search, governance, and audit contracts. Keep PostgreSQL authoritative for registry metadata, digest mappings, and immutable artifact payloads, using split tables for metadata and content, and treat Git only as optional authoring provenance rather than a runtime storage backend.
 - **Success Criteria**:
   - 100% of artifact and metadata writes happen through server APIs.
-  - Immutable overwrite attempts for existing `(skill_id, version)` are rejected 100% of the time.
+  - Immutable overwrite attempts for existing `(slug, version)` are rejected 100% of the time.
   - Identical artifact content published under different versions is deduplicated by `sha256` digest mapping in PostgreSQL and reused from a single immutable artifact row.
   - Target discovery API p95 <= 250 ms for top-20 candidate retrieval on a 10,000-skill catalog with indexed filters.
   - Target exact metadata fetch API p95 <= 150 ms on the same catalog assumption.
@@ -20,7 +20,7 @@
 
 - **Current Status**:
   - FastAPI service is implemented with PostgreSQL-backed publish, fetch, list, discovery, direct relationship, lifecycle, auth, and audit paths.
-  - The current HTTP surface uses concrete routes such as `POST /skill-versions`, `POST /discovery`, and `POST /fetch/metadata:batch`.
+  - The current HTTP surface uses concrete routes such as `POST /skill-versions`, `POST /discovery`, and `GET /skills/{slug}/versions/{version}`.
   - Digest-backed `ETag` emission on exact content fetch is implemented.
   - Full conditional-read behavior with `If-None-Match` returning `304 Not Modified` is not yet documented as implemented behavior.
 - **Planned State**:
@@ -43,11 +43,10 @@
 
 - **Acceptance Criteria**:
   - The publish capability validates manifest schema, integrity fields, direct relationship selectors, trust-tier rules, and lifecycle requirements before accepting a new immutable version.
-  - Publishing an existing `(skill_id, version)` returns a conflict and does not mutate stored metadata or artifacts.
+  - Publishing an existing `(slug, version)` returns a conflict and does not mutate stored metadata or artifacts.
   - Published versions persist direct dependency declarations exactly as authored; the server does not compute resolved dependency closures.
   - The discovery capability supports full-text query plus structured filters over tags, language, trust tier, lifecycle state, freshness, and content-size limits.
   - Search results return stable ordering, deterministic tie-breaks, and explanation fields describing why a result matched.
-  - The identity/list capability returns published versions and lifecycle state without exposing internal tables or derived storage details.
   - The exact fetch capability returns immutable metadata, integrity fields, artifact reference data, and optional provenance metadata for the requested published version.
   - Published versions map immutably to a single `sha256` digest, and identical payloads reuse existing digest-backed PostgreSQL artifact rows.
   - Exact fetch and search behavior do not depend on a live Git checkout.
@@ -64,7 +63,7 @@
 - **Current Status**:
   - Publish is implemented at `POST /skill-versions`.
   - Discovery is implemented at `POST /discovery`.
-  - Immutable metadata and content fetch are implemented as batch-only routes.
+  - Immutable metadata and content fetch are implemented as exact `GET` routes.
   - Direct dependency reads are implemented at `GET /resolution/{slug}/{version}`.
   - Bearer-token auth with `read`, `publish`, and `admin` scopes is enforced on business endpoints.
 - **Planned State**:
@@ -157,7 +156,7 @@ flowchart LR
 
 - **Current Status**:
   - The implementation matches the storage report recommendation: PostgreSQL only, with split metadata/content persistence and digest-addressed deduplication.
-  - The current API surface includes health, readiness, publish, discovery, relationship reads, exact fetch, identity/list, and lifecycle status update routes.
+  - The current API surface includes health, readiness, publish, discovery, relationship reads, exact fetch, and lifecycle status update routes.
   - Exact content responses emit `ETag` and `Cache-Control: public, immutable`.
 - **Planned State**:
   - Harden immutable-read cache semantics to full conditional GET behavior.
@@ -190,9 +189,9 @@ flowchart LR
 ## 6. Boundary Contract & Exit Criteria
 
 - **Server Boundary**:
-  - Public API surface is limited to publish, fetch, list, search, direct relationship reads, and governance operations.
+  - Public API surface is limited to publish, discovery, exact immutable fetch, direct relationship reads, and governance operations.
   - Search is candidate generation over indexed registry data; the server does not interpret prompts or choose final results.
-  - Exact `(skill_id, version)` reads are immutable and content-addressed through PostgreSQL-backed digest mappings to PostgreSQL artifact rows.
+  - Exact `(slug, version)` reads are immutable and content-addressed through PostgreSQL-backed digest mappings to PostgreSQL artifact rows.
   - Git provenance is advisory metadata only and is never a required runtime dependency for publish, search, or exact fetch behavior.
   - Derived search indexes are allowed for performance, but canonical truth remains the published version record and digest mapping.
 

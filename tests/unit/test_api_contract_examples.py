@@ -13,7 +13,6 @@ from app.interface.dto.examples import (
     DISCOVERY_RESPONSE_EXAMPLE,
     DUPLICATE_SKILL_VERSION_ERROR_EXAMPLE,
     INVALID_REQUEST_ERROR_EXAMPLE,
-    METADATA_BATCH_RESPONSE_EXAMPLE,
     PUBLISH_REQUEST_EXAMPLE,
     RESOLUTION_RESPONSE_EXAMPLE,
     SKILL_VERSION_METADATA_RESPONSE_EXAMPLE,
@@ -25,7 +24,6 @@ from app.interface.dto.skills import (
     SkillDiscoveryRequest,
     SkillDiscoveryResponse,
     SkillVersionCreateRequest,
-    SkillVersionMetadataBatchResponse,
     SkillVersionMetadataResponse,
     SkillVersionStatusResponse,
 )
@@ -54,7 +52,6 @@ def test_discovery_request_example_matches_request_contract() -> None:
         (SKILL_VERSION_METADATA_RESPONSE_EXAMPLE, SkillVersionMetadataResponse),
         (DISCOVERY_RESPONSE_EXAMPLE, SkillDiscoveryResponse),
         (RESOLUTION_RESPONSE_EXAMPLE, SkillDependencyResolutionResponse),
-        (METADATA_BATCH_RESPONSE_EXAMPLE, SkillVersionMetadataBatchResponse),
         (SKILL_VERSION_STATUS_RESPONSE_EXAMPLE, SkillVersionStatusResponse),
     ],
 )

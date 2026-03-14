@@ -104,21 +104,6 @@ RESOLUTION_RESPONSE_EXAMPLE = {
     ],
 }
 
-METADATA_BATCH_RESPONSE_EXAMPLE = {
-    "results": [
-        {
-            "status": "found",
-            "coordinate": {"slug": "python.lint", "version": "1.2.3"},
-            "item": SKILL_VERSION_METADATA_RESPONSE_EXAMPLE,
-        },
-        {
-            "status": "not_found",
-            "coordinate": {"slug": "python.missing", "version": "9.9.9"},
-            "item": None,
-        },
-    ]
-}
-
 INVALID_REQUEST_ERROR_EXAMPLE = {
     "error": {
         "code": "INVALID_REQUEST",

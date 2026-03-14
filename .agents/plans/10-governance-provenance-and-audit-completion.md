@@ -1,7 +1,7 @@
 # Plan 10 - Governance, Provenance, and Audit Completion
 
 ## Goal
-Complete the governance model over the finalized PostgreSQL-backed registry while assuming the hard-cut public contract from Plans 07-09: discovery candidates, exact first-degree resolution, batch metadata fetch, batch content fetch, and governed write operations.
+Complete the governance model over the finalized PostgreSQL-backed registry while assuming the hard-cut public contract from Plans 07-09: discovery candidates, exact first-degree resolution, exact metadata fetch, exact content fetch, and governed write operations.
 
 ## Stack Alignment
 - Runtime: Python 3.12+
@@ -15,9 +15,9 @@ Complete the governance model over the finalized PostgreSQL-backed registry whil
 - Apply governance consistently across:
   - `POST /discovery` visibility
   - `GET /resolution/{slug}/{version}` exact-read policy
-  - `POST /fetch/metadata:batch` exact-read policy
-  - `POST /fetch/content:batch` exact-read policy
-- Apply governance inside the existing publish, discovery, resolution, batch fetch, and lifecycle endpoints; do not add provenance, audit, or policy-specific public endpoint families.
+  - `GET /skills/{slug}/versions/{version}` exact-read policy
+  - `GET /skills/{slug}/versions/{version}/content` exact-read policy
+- Apply governance inside the existing publish, discovery, resolution, exact fetch, and lifecycle endpoints; do not add provenance, audit, or policy-specific public endpoint families.
 - Capture provenance metadata such as repository identity, commit SHA, tree path, publisher identity, and trust context as advisory publish-time metadata stored in PostgreSQL.
 - Keep provenance advisory only; it must never become a runtime dependency for discovery, resolution, or fetch behavior.
 - Complete audit coverage for publish, lifecycle, trust-policy, provenance, and privileged governance actions.

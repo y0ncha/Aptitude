@@ -5,16 +5,21 @@
 $kind: collection
 
 name: API
-description: |-
+description: >-
   Collection for validating the current Aptitude Skills API.
 
-    - Sanity: covers authenticated publish, lifecycle updates, batch fetch, discovery, and resolution
-    - Negative: covers authenticated validation, duplicate, not-found, and batch not_found responses
+    - Sanity: covers authenticated publish, lifecycle updates, exact fetch, discovery, and resolution
+    - Negative: covers authenticated validation, duplicate, exact-fetch errors, and resolution errors
 
-  Note: `/readyz` exposes a 503 branch only when the runtime is unhealthy, so the collection
+  Note: `/readyz` exposes a 503 branch only when the runtime is unhealthy, so
+  the collection
+
   asserts the healthy `200 ready` path by default.
 
-  All business endpoints require `Authorization: Bearer <token>`. The default token variables
+
+  All business endpoints require `Authorization: Bearer <token>`. The default
+  token variables
+
   match the local development `AUTH_TOKENS_JSON` example from the README.
 
 variables:
@@ -35,10 +40,10 @@ variables:
   negative_missing_version: 9.9.9
   invalid_slug: invalid slug
   invalid_version: not-a-semver
+  sanity_primary_content_digest: ""
 
 scripts:
   - type: http:beforeRequest
-    language: text/javascript
     code: >-
       const requestName = pm.info.requestName || '';
 
@@ -63,3 +68,4 @@ scripts:
 
 
       ensureRunState(resetFlowStarts.has(requestName));
+    language: text/javascript

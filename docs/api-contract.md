@@ -17,8 +17,8 @@ Public routes:
 - `POST /skill-versions`
 - `POST /discovery`
 - `GET /resolution/{slug}/{version}`
-- `POST /fetch/metadata:batch`
-- `POST /fetch/content:batch`
+- `GET /skills/{slug}/versions/{version}`
+- `GET /skills/{slug}/versions/{version}/content`
 - `PATCH /skills/{slug}/versions/{version}/status`
 
 ## Auth And Errors
@@ -63,7 +63,7 @@ Exact immutable coordinates use:
 }
 ```
 
-Publish and metadata batch fetch return the same immutable metadata envelope:
+Publish and exact metadata fetch return the same immutable metadata envelope:
 
 ```json
 {
@@ -100,8 +100,8 @@ Publish and metadata batch fetch return the same immutable metadata envelope:
 | `POST` | `/skill-versions` | `publish` | `201` | Publish one immutable `slug@version` |
 | `POST` | `/discovery` | `read` | `200` | Returns ordered candidate `slug` values only |
 | `GET` | `/resolution/{slug}/{version}` | `read` | `200` | Returns direct authored `depends_on` only |
-| `POST` | `/fetch/metadata:batch` | `read` | `200` | Returns ordered immutable metadata results |
-| `POST` | `/fetch/content:batch` | `read` | `200` | Returns ordered markdown as `multipart/mixed` |
+| `GET` | `/skills/{slug}/versions/{version}` | `read` | `200` | Returns immutable metadata for one exact coordinate |
+| `GET` | `/skills/{slug}/versions/{version}/content` | `read` | `200` | Returns immutable markdown with cache headers |
 | `PATCH` | `/skills/{slug}/versions/{version}/status` | `admin` | `200` | Transitions lifecycle state |
 
 ## Route Semantics
@@ -160,37 +160,34 @@ Rules:
 - No recursion, solving, or transitive expansion.
 - No `extends`, `conflicts_with`, or `overlaps_with` in the response.
 
-### `POST /fetch/metadata:batch`
+### `GET /skills/{slug}/versions/{version}`
 
-Request:
+Returns the immutable metadata envelope for one exact coordinate.
 
-```json
-{
-  "coordinates": [
-    {"slug": "python.lint", "version": "1.2.3"},
-    {"slug": "python.missing", "version": "9.9.9"}
-  ]
-}
-```
+Rules:
 
-Response order matches request order. Missing coordinates are returned inline as
-`not_found`.
+- Exact read only, not search.
+- Returns the same metadata envelope shape as publish.
+- Missing coordinates return `404`.
+- Read policy matches exact resolution rules: `published` and `deprecated` are readable with `read`; `archived` is admin-only.
 
-### `POST /fetch/content:batch`
+### `GET /skills/{slug}/versions/{version}/content`
 
-Uses the same request body as metadata batch and returns `multipart/mixed`.
-Every part includes:
+Returns the immutable markdown body for one exact coordinate as
+`text/markdown; charset=utf-8`.
 
-- `Content-Type: text/markdown; charset=utf-8`
-- `X-Aptitude-Slug`
-- `X-Aptitude-Version`
-- `X-Aptitude-Status`
-
-Found parts also include:
+Success headers include:
 
 - `ETag`
 - `Cache-Control: public, immutable`
 - `Content-Length`
+
+Rules:
+
+- Exact read only, not search.
+- Missing coordinates return `404`.
+- The body is the raw stored markdown; metadata stays on the metadata route.
+- Read policy matches the metadata exact-read route.
 
 ### `POST /skill-versions`
 
@@ -275,20 +272,13 @@ the next decision.
 
 ### Fetch Flow
 
-1. [`app/interface/api/fetch.py`](../app/interface/api/fetch.py) validates a batch of exact coordinates and requires `read`.
-2. [`app/core/skill_fetch.py`](../app/core/skill_fetch.py) calls batch repository reads for metadata or content.
-3. The core service checks exact-read governance on every found row.
-4. The service rebuilds results in request order, inserting `not_found` entries
-   where no row exists.
+1. [`app/interface/api/fetch.py`](../app/interface/api/fetch.py) validates `slug` and `version` path params and requires `read`.
+2. [`app/core/skill_fetch.py`](../app/core/skill_fetch.py) performs one exact repository lookup for metadata or content.
+3. The core service checks exact-read governance on the stored lifecycle status.
+4. Missing coordinates raise `SKILL_VERSION_NOT_FOUND`.
 5. The route serializes:
-   - metadata as JSON envelopes
-   - content as `multipart/mixed` with immutable cache headers and per-part coordinate metadata
-
-The important implementation detail is that persistence reads can return rows in
-database order, but the fetch service reindexes them by `(slug, version)` and
-then reconstructs the response in the caller's original order. That keeps batch
-fetch deterministic and lets `not_found` stay inline instead of becoming a hard
-error for the whole request.
+   - metadata as the immutable JSON envelope
+   - content as raw markdown bytes with immutable cache headers
 
 ## Governance Defaults
 

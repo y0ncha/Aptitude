@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import ValidationError
 
-from app.core.skill_fetch import SkillVersionMetadataBatchItem
 from app.core.skill_models import (
     CreateSkillVersionCommand,
     ProvenanceMetadata,
@@ -32,9 +31,7 @@ from app.interface.dto.skills import (
     SkillDependencyResolutionResponse,
     SkillGovernanceRequest,
     SkillMetadataResponse,
-    SkillVersionCoordinateRequest,
     SkillVersionCreateRequest,
-    SkillVersionMetadataBatchItemResponse,
     SkillVersionMetadataResponse,
     SkillVersionStatusResponse,
 )
@@ -97,22 +94,6 @@ def to_metadata_response(detail: SkillVersionDetail) -> SkillVersionMetadataResp
         trust_tier=detail.trust_tier,
         provenance=_provenance_response(detail.provenance),
         published_at=detail.published_at,
-    )
-
-
-def to_metadata_batch_item_response(
-    item: SkillVersionMetadataBatchItem,
-) -> SkillVersionMetadataBatchItemResponse:
-    """Convert one immutable metadata batch item into the public schema."""
-    status: Literal["found", "not_found"]
-    status = "not_found" if item.item is None else "found"
-    return SkillVersionMetadataBatchItemResponse(
-        status=status,
-        coordinate=SkillVersionCoordinateRequest(
-            slug=item.coordinate.slug,
-            version=item.coordinate.version,
-        ),
-        item=None if item.item is None else to_metadata_response(item.item),
     )
 
 

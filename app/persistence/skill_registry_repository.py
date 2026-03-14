@@ -13,25 +13,21 @@ from app.core.governance import LifecycleStatus, TrustTier
 from app.core.ports import (
     CreateSkillVersionRecord,
     ExactSkillCoordinate,
-    RelationshipSelectorRecordInput,
     SearchCandidatesRequest,
     SkillRegistryPersistenceError,
     SkillRegistryPort,
     SkillRelationshipReadPort,
     SkillSearchPort,
     SkillVersionReadPort,
-    StoredSkillIdentity,
     StoredSkillRelationshipSource,
     StoredSkillSearchCandidate,
     StoredSkillVersion,
     StoredSkillVersionContent,
     StoredSkillVersionStatus,
-    StoredSkillVersionSummary,
 )
 from app.core.skill_registry import DuplicateSkillVersionError
 from app.persistence.models.skill import Skill
 from app.persistence.models.skill_content import SkillContent
-from app.persistence.models.skill_dependency import SkillDependency
 from app.persistence.models.skill_metadata import SkillMetadata
 from app.persistence.models.skill_relationship_selector import SkillRelationshipSelector
 from app.persistence.models.skill_search_document import SkillSearchDocument
@@ -46,7 +42,6 @@ from app.persistence.skill_registry_repository_support import (
     sort_relationship_selectors,
     to_stored_selector,
     to_stored_skill_version,
-    to_stored_skill_version_summary,
 )
 
 
@@ -137,12 +132,6 @@ class SQLAlchemySkillRegistryRepository(
                 ]
                 session.add_all(selector_rows)
                 session.flush()
-
-                self._create_exact_dependencies(
-                    session=session,
-                    source_version_id=skill_version.id,
-                    relationships=record.relationships,
-                )
                 session.add(
                     build_search_document(
                         skill_version_id=skill_version.id,
@@ -154,8 +143,6 @@ class SQLAlchemySkillRegistryRepository(
                         content_size_bytes=record.content.size_bytes,
                     )
                 )
-
-                skill.current_version_id = skill_version.id
                 session.commit()
 
                 reloaded = self._get_version_entity(
@@ -182,29 +169,6 @@ class SQLAlchemySkillRegistryRepository(
                     "Failed to persist immutable skill version."
                 ) from exc
 
-    def get_skill(self, *, slug: str) -> StoredSkillIdentity | None:
-        with self._session_factory() as session:
-            current_version = SkillVersion
-            statement = (
-                select(
-                    Skill,
-                    current_version.version,
-                )
-                .outerjoin(current_version, current_version.id == Skill.current_version_id)
-                .where(Skill.slug == slug)
-            )
-            row = session.execute(statement).one_or_none()
-            if row is None:
-                return None
-
-            skill, version = row
-            return StoredSkillIdentity(
-                slug=skill.slug,
-                current_version=cast(str | None, version),
-                created_at=skill.created_at,
-                updated_at=skill.updated_at,
-            )
-
     def get_version(self, *, slug: str, version: str) -> StoredSkillVersion | None:
         with self._session_factory() as session:
             entity = self._get_version_entity(session=session, slug=slug, version=version)
@@ -212,93 +176,34 @@ class SQLAlchemySkillRegistryRepository(
                 return None
             return to_stored_skill_version(entity)
 
-    def get_version_content(self, *, slug: str, version: str) -> StoredSkillVersionContent | None:
+    def get_version_content(
+        self,
+        *,
+        slug: str,
+        version: str,
+    ) -> StoredSkillVersionContent | None:
         with self._session_factory() as session:
-            entity = self._get_version_entity(session=session, slug=slug, version=version)
-            if entity is None:
+            statement = (
+                select(SkillVersion)
+                .join(Skill, Skill.id == SkillVersion.skill_fk)
+                .options(
+                    joinedload(SkillVersion.skill),
+                    joinedload(SkillVersion.content),
+                )
+                .where(Skill.slug == slug, SkillVersion.version == version)
+            )
+            item = session.execute(statement).scalar_one_or_none()
+            if item is None:
                 return None
             return StoredSkillVersionContent(
-                slug=entity.skill.slug,
-                version=entity.version,
-                raw_markdown=entity.content.raw_markdown,
-                checksum_digest=entity.content.checksum_digest,
-                size_bytes=entity.content.storage_size_bytes,
-                lifecycle_status=cast(LifecycleStatus, entity.lifecycle_status),
-                trust_tier=cast(TrustTier, entity.trust_tier),
+                slug=item.skill.slug,
+                version=item.version,
+                raw_markdown=item.content.raw_markdown,
+                checksum_digest=item.content.checksum_digest,
+                size_bytes=item.content.storage_size_bytes,
+                lifecycle_status=cast(LifecycleStatus, item.lifecycle_status),
+                trust_tier=cast(TrustTier, item.trust_tier),
             )
-
-    def get_versions_batch(
-        self,
-        *,
-        coordinates: tuple[ExactSkillCoordinate, ...],
-    ) -> tuple[StoredSkillVersion, ...]:
-        if not coordinates:
-            return ()
-
-        coordinate_pairs = [(item.slug, item.version) for item in coordinates]
-        with self._session_factory() as session:
-            statement = (
-                select(SkillVersion)
-                .join(Skill, Skill.id == SkillVersion.skill_fk)
-                .options(
-                    joinedload(SkillVersion.skill),
-                    joinedload(SkillVersion.content),
-                    joinedload(SkillVersion.metadata_row),
-                    selectinload(SkillVersion.relationship_selectors),
-                )
-                .where(tuple_(Skill.slug, SkillVersion.version).in_(coordinate_pairs))
-            )
-            rows = session.execute(statement).scalars().all()
-            return tuple(to_stored_skill_version(item) for item in rows)
-
-    def get_version_contents_batch(
-        self,
-        *,
-        coordinates: tuple[ExactSkillCoordinate, ...],
-    ) -> tuple[StoredSkillVersionContent, ...]:
-        if not coordinates:
-            return ()
-
-        coordinate_pairs = [(item.slug, item.version) for item in coordinates]
-        with self._session_factory() as session:
-            statement = (
-                select(SkillVersion)
-                .join(Skill, Skill.id == SkillVersion.skill_fk)
-                .options(
-                    joinedload(SkillVersion.skill),
-                    joinedload(SkillVersion.content),
-                )
-                .where(tuple_(Skill.slug, SkillVersion.version).in_(coordinate_pairs))
-            )
-            rows = session.execute(statement).scalars().all()
-            return tuple(
-                StoredSkillVersionContent(
-                    slug=item.skill.slug,
-                    version=item.version,
-                    raw_markdown=item.content.raw_markdown,
-                    checksum_digest=item.content.checksum_digest,
-                    size_bytes=item.content.storage_size_bytes,
-                    lifecycle_status=cast(LifecycleStatus, item.lifecycle_status),
-                    trust_tier=cast(TrustTier, item.trust_tier),
-                )
-                for item in rows
-            )
-
-    def list_versions(self, *, slug: str) -> tuple[StoredSkillVersionSummary, ...]:
-        with self._session_factory() as session:
-            statement = (
-                select(SkillVersion)
-                .join(Skill, Skill.id == SkillVersion.skill_fk)
-                .options(
-                    joinedload(SkillVersion.skill),
-                    joinedload(SkillVersion.content),
-                    joinedload(SkillVersion.metadata_row),
-                )
-                .where(Skill.slug == slug)
-                .order_by(SkillVersion.published_at.desc(), SkillVersion.id.desc())
-            )
-            rows = session.execute(statement).scalars().all()
-            return tuple(to_stored_skill_version_summary(item) for item in rows)
 
     def get_relationship_sources_batch(
         self,
@@ -400,10 +305,7 @@ class SQLAlchemySkillRegistryRepository(
                     search_document.lifecycle_status = lifecycle_status
                     session.add(search_document)
 
-                skill = session.get(Skill, entity.skill_fk)
-                if skill is None:
-                    raise SkillRegistryPersistenceError("Skill identity is missing.")
-                skill.current_version_id = self._select_current_version_id(
+                current_default_version_id = self._select_current_default_version_id(
                     session=session,
                     skill_id=entity.skill_fk,
                 )
@@ -416,7 +318,7 @@ class SQLAlchemySkillRegistryRepository(
                     lifecycle_status=cast(LifecycleStatus, entity.lifecycle_status),
                     trust_tier=cast(TrustTier, entity.trust_tier),
                     lifecycle_changed_at=entity.lifecycle_changed_at,
-                    is_current_default=skill.current_version_id == entity.id,
+                    is_current_default=current_default_version_id == entity.id,
                 )
             except SQLAlchemyError as exc:
                 session.rollback()
@@ -460,36 +362,7 @@ class SQLAlchemySkillRegistryRepository(
         return created
 
     @staticmethod
-    def _create_exact_dependencies(
-        *,
-        session: Session,
-        source_version_id: int,
-        relationships: tuple[RelationshipSelectorRecordInput, ...],
-    ) -> None:
-        for relationship in relationships:
-            if relationship.version is None:
-                continue
-            target = session.execute(
-                select(SkillVersion.id)
-                .join(Skill, Skill.id == SkillVersion.skill_fk)
-                .where(
-                    Skill.slug == relationship.slug,
-                    SkillVersion.version == relationship.version,
-                )
-            ).scalar_one_or_none()
-            if target is None:
-                continue
-            session.add(
-                SkillDependency(
-                    from_version_fk=source_version_id,
-                    to_version_fk=target,
-                    constraint_type=relationship.edge_type,
-                    version_constraint=relationship.version_constraint,
-                )
-            )
-
-    @staticmethod
-    def _select_current_version_id(*, session: Session, skill_id: int) -> int | None:
+    def _select_current_default_version_id(*, session: Session, skill_id: int) -> int | None:
         return session.execute(
             select(SkillVersion.id)
             .where(

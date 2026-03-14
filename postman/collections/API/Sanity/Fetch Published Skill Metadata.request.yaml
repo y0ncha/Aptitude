@@ -1,0 +1,42 @@
+$kind: http-request
+order: 8000
+
+method: GET
+url: '{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}'
+
+headers:
+  - key: Accept
+    value: application/json
+    description: Request immutable metadata for one exact coordinate
+  - key: Authorization
+    value: 'Bearer {{readToken}}'
+    description: Authenticate with a caller that has the `read` scope
+
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const json = pm.response.json();
+
+      pm.test('Status is 200', () => {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Exact metadata fetch returns the immutable metadata envelope', () => {
+        pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));
+        pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_2'));
+        pm.expect(json.metadata.name).to.eql('Postman Primary Skill');
+        pm.expect(json.content.rendered_summary).to.eql('Postman primary skill version 2.');
+        pm.expect(json.content.checksum.algorithm).to.eql('sha256');
+        pm.expect(json.content.checksum.digest).to.be.a('string').and.not.empty;
+        pm.expect(json.lifecycle_status).to.eql('deprecated');
+        pm.expect(json.trust_tier).to.eql('untrusted');
+        pm.expect(json).to.not.have.property('relationships');
+        pm.expect(json).to.not.have.property('content_download_path');
+      });
+
+      pm.collectionVariables.set('sanity_primary_content_digest', json.content.checksum.digest);
+
+      pm.execution.setNextRequest(
+        pm.response.code === 200 ? 'Fetch Published Skill Content' : null,
+      );
