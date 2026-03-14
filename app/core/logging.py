@@ -61,7 +61,7 @@ def build_logging_config(level: str) -> dict[str, Any]:
             },
             "uvicorn.access": {
                 "handlers": ["default"],
-                "level": noisy_library_level,
+                "level": resolved_level,
                 "propagate": False,
             },
             "fastapi": {

@@ -21,7 +21,7 @@ def test_build_logging_config_uses_shared_format_for_app_and_libraries() -> None
     assert config["loggers"]["app"]["level"] == logging.INFO
     assert config["loggers"]["uvicorn.error"]["handlers"] == ["default"]
     assert config["loggers"]["uvicorn.error"]["propagate"] is False
-    assert config["loggers"]["uvicorn.access"]["level"] == logging.WARNING
+    assert config["loggers"]["uvicorn.access"]["level"] == logging.INFO
     assert config["loggers"]["uvicorn.access"]["propagate"] is False
     assert config["loggers"]["watchfiles"]["level"] == logging.WARNING
     assert config["loggers"]["sqlalchemy"]["handlers"] == ["default"]
