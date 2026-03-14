@@ -10,21 +10,17 @@ from fastapi.responses import JSONResponse
 from app.core.dependencies import (
     AdminCallerDep,
     PublishCallerDep,
-    ReadCallerDep,
     SkillRegistryServiceDep,
 )
 from app.core.skill_registry import (
     DuplicateSkillVersionError,
-    SkillNotFoundError,
     SkillRegistryError,
     SkillVersionNotFoundError,
 )
 from app.interface.api.errors import error_response
 from app.interface.api.skill_api_support import (
     to_create_command,
-    to_skill_identity_response,
-    to_version_list_response,
-    to_version_response,
+    to_metadata_response,
     to_version_status_response,
 )
 from app.interface.dto.errors import ErrorEnvelope
@@ -32,19 +28,14 @@ from app.interface.dto.examples import (
     CONTENT_STORAGE_FAILURE_ERROR_EXAMPLE,
     DUPLICATE_SKILL_VERSION_ERROR_EXAMPLE,
     INVALID_REQUEST_ERROR_EXAMPLE,
-    LIST_SUCCESS_EXAMPLE,
     PUBLISH_REQUEST_EXAMPLE,
-    SKILL_IDENTITY_SUCCESS_EXAMPLE,
-    SKILL_NOT_FOUND_ERROR_EXAMPLE,
+    SKILL_VERSION_METADATA_RESPONSE_EXAMPLE,
     SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
-    SKILL_VERSION_RESPONSE_EXAMPLE,
     SKILL_VERSION_STATUS_RESPONSE_EXAMPLE,
 )
 from app.interface.dto.skills import (
-    SkillIdentityResponse,
     SkillVersionCreateRequest,
-    SkillVersionListResponse,
-    SkillVersionResponse,
+    SkillVersionMetadataResponse,
     SkillVersionStatusResponse,
     SkillVersionStatusUpdateRequest,
 )
@@ -52,9 +43,9 @@ from app.interface.validation import SEMVER_PATTERN, SLUG_PATTERN
 
 router = APIRouter(tags=["skills"])
 
-OpenAPIResponses = dict[int | str, dict[str, Any]]
+ApiResponses = dict[int | str, dict[str, Any]]
 
-REQUEST_VALIDATION_ERROR_RESPONSE: OpenAPIResponses = {
+REQUEST_VALIDATION_ERROR_RESPONSE: ApiResponses = {
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
         "model": ErrorEnvelope,
         "description": "The request body, path parameters, or query parameters are invalid.",
@@ -62,10 +53,10 @@ REQUEST_VALIDATION_ERROR_RESPONSE: OpenAPIResponses = {
     }
 }
 
-PUBLISH_RESPONSES: OpenAPIResponses = {
+PUBLISH_RESPONSES: ApiResponses = {
     status.HTTP_201_CREATED: {
         "description": "Immutable skill version published successfully.",
-        "content": {"application/json": {"example": SKILL_VERSION_RESPONSE_EXAMPLE}},
+        "content": {"application/json": {"example": SKILL_VERSION_METADATA_RESPONSE_EXAMPLE}},
     },
     status.HTTP_409_CONFLICT: {
         "model": ErrorEnvelope,
@@ -80,33 +71,7 @@ PUBLISH_RESPONSES: OpenAPIResponses = {
     **REQUEST_VALIDATION_ERROR_RESPONSE,
 }
 
-IDENTITY_RESPONSES: OpenAPIResponses = {
-    status.HTTP_200_OK: {
-        "description": "Logical skill identity returned successfully.",
-        "content": {"application/json": {"example": SKILL_IDENTITY_SUCCESS_EXAMPLE}},
-    },
-    status.HTTP_404_NOT_FOUND: {
-        "model": ErrorEnvelope,
-        "description": "The requested skill slug does not exist.",
-        "content": {"application/json": {"example": SKILL_NOT_FOUND_ERROR_EXAMPLE}},
-    },
-    **REQUEST_VALIDATION_ERROR_RESPONSE,
-}
-
-LIST_RESPONSES: OpenAPIResponses = {
-    status.HTTP_200_OK: {
-        "description": "Immutable versions listed successfully.",
-        "content": {"application/json": {"example": LIST_SUCCESS_EXAMPLE}},
-    },
-    status.HTTP_404_NOT_FOUND: {
-        "model": ErrorEnvelope,
-        "description": "The requested skill slug does not exist.",
-        "content": {"application/json": {"example": SKILL_NOT_FOUND_ERROR_EXAMPLE}},
-    },
-    **REQUEST_VALIDATION_ERROR_RESPONSE,
-}
-
-STATUS_RESPONSES: OpenAPIResponses = {
+STATUS_RESPONSES: ApiResponses = {
     status.HTTP_200_OK: {
         "description": "Lifecycle status updated successfully.",
         "content": {"application/json": {"example": SKILL_VERSION_STATUS_RESPONSE_EXAMPLE}},
@@ -128,7 +93,7 @@ STATUS_RESPONSES: OpenAPIResponses = {
         "Create a new immutable skill version from a normalized JSON payload containing "
         "markdown content, structured metadata, and authored relationships."
     ),
-    response_model=SkillVersionResponse,
+    response_model=SkillVersionMetadataResponse,
     response_model_exclude_unset=True,
     status_code=status.HTTP_201_CREATED,
     responses=PUBLISH_RESPONSES,
@@ -140,11 +105,11 @@ def create_skill_version(
     request: SkillVersionCreateRequest,
     registry_service: SkillRegistryServiceDep,
     caller: PublishCallerDep,
-) -> SkillVersionResponse | JSONResponse:
+) -> SkillVersionMetadataResponse | JSONResponse:
     """Publish one immutable normalized skill version."""
     try:
         stored = registry_service.publish_version(caller=caller, command=to_create_command(request))
-        return to_version_response(stored)
+        return to_metadata_response(stored)
     except DuplicateSkillVersionError as exc:
         return error_response(
             status_code=status.HTTP_409_CONFLICT,
@@ -157,65 +122,6 @@ def create_skill_version(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             code="CONTENT_STORAGE_FAILURE",
             message=str(exc),
-        )
-
-
-@router.get(
-    "/skills/{slug}",
-    operation_id="getSkillIdentity",
-    summary="Fetch one logical skill identity",
-    description="Return the normalized identity row for a skill slug.",
-    response_model=SkillIdentityResponse,
-    response_model_exclude_unset=True,
-    responses=IDENTITY_RESPONSES,
-)
-def get_skill_identity(
-    registry_service: SkillRegistryServiceDep,
-    caller: ReadCallerDep,
-    slug: Annotated[
-        str,
-        Path(pattern=SLUG_PATTERN, description="Stable public slug of the skill."),
-    ],
-) -> SkillIdentityResponse | JSONResponse:
-    """Return one logical skill identity."""
-    try:
-        return to_skill_identity_response(registry_service.get_skill(caller=caller, slug=slug))
-    except SkillNotFoundError as exc:
-        return error_response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            code="SKILL_NOT_FOUND",
-            message=str(exc),
-            details={"slug": exc.slug},
-        )
-
-
-@router.get(
-    "/skills/{slug}/versions",
-    operation_id="listSkillVersions",
-    summary="List immutable versions for one skill",
-    description="Return immutable versions in deterministic reverse chronological order.",
-    response_model=SkillVersionListResponse,
-    response_model_exclude_unset=True,
-    responses=LIST_RESPONSES,
-)
-def list_skill_versions(
-    registry_service: SkillRegistryServiceDep,
-    caller: ReadCallerDep,
-    slug: Annotated[
-        str,
-        Path(pattern=SLUG_PATTERN, description="Stable public slug of the skill."),
-    ],
-) -> SkillVersionListResponse | JSONResponse:
-    """List immutable versions for one skill slug."""
-    try:
-        versions = registry_service.list_versions(caller=caller, slug=slug)
-        return to_version_list_response(slug=slug, versions=versions)
-    except SkillNotFoundError as exc:
-        return error_response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            code="SKILL_NOT_FOUND",
-            message=str(exc),
-            details={"slug": exc.slug},
         )
 
 

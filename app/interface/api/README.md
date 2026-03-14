@@ -11,13 +11,12 @@ adapter layer between FastAPI and core services.
 ## Key Files
 
 - `health.py`: liveness/readiness endpoints (`/healthz`, `/readyz`).
-- `discovery.py`: advisory metadata and description search routes under
-  `/discovery`.
-- `resolution.py`: direct immutable relationship read routes under
-  `/resolution`.
-- `fetch.py`: exact immutable metadata and markdown content routes under
-  `/skills/{slug}/versions/...`.
-- `skills.py`: publish, identity, version-list, and lifecycle-status routes.
+- `discovery.py`: body-based candidate lookup route at `/discovery`.
+- `resolution.py`: exact first-degree dependency read route at
+  `/resolution/{slug}/{version}`.
+- `fetch.py`: immutable metadata and markdown batch fetch routes under
+  `/fetch/...`.
+- `skills.py`: publish and lifecycle-status routes.
 - `errors.py`: stable JSON error envelope helpers and FastAPI exception
   handlers.
 - `skill_api_support.py`: DTO-to-core translation helpers and shared response
@@ -29,16 +28,14 @@ adapter layer between FastAPI and core services.
 - `GET /healthz`: process liveness probe.
 - `GET /readyz`: dependency readiness probe with a `503` response when the
   service is not ready.
-- `GET /discovery/skills/search`: discovery-only candidate search over indexed
-  skill metadata.
-- `POST /resolution/relationships:batch`: direct authored relationship lookup
-  for exact immutable versions.
-- `GET /skills/{slug}`: logical skill identity lookup.
-- `GET /skills/{slug}/versions`: deterministic listing of immutable versions
-  for one skill.
-- `GET /skills/{slug}/versions/{version}`: exact immutable metadata fetch.
-- `GET /skills/{slug}/versions/{version}/content`: raw markdown fetch with
-  immutable cache headers.
+- `POST /discovery`: discovery-only candidate lookup returning ordered slug
+  candidates.
+- `GET /resolution/{slug}/{version}`: direct authored `depends_on`
+  declarations for one immutable version.
+- `POST /fetch/metadata:batch`: ordered immutable metadata fetch for exact
+  coordinates.
+- `POST /fetch/content:batch`: ordered immutable markdown fetch as
+  `multipart/mixed`.
 - `POST /skill-versions`: immutable skill version publication.
 - `PATCH /skills/{slug}/versions/{version}/status`: lifecycle-status transition
   for one immutable version.
@@ -51,10 +48,10 @@ translate results into public DTOs without embedding business policy.
 policy violations, and explicit API errors share one JSON shape.
 `skill_api_support.py` centralizes mapping code so route handlers do not
 duplicate DTO conversion or publish-command assembly.
-`GET /discovery/skills/search` is candidate generation only and does not choose
-final matches, solve dependencies, or plan execution.
-`POST /resolution/relationships:batch` returns direct authored relationships
-only; it does not expand transitive graphs or select versions for constraints.
-The exact fetch routes intentionally separate metadata from markdown bytes so
-the public API does not expose storage layout details and can attach cache
-headers to content downloads cleanly.
+`POST /discovery` is candidate generation only and does not choose final
+matches, solve dependencies, or plan execution.
+`GET /resolution/{slug}/{version}` returns direct authored dependencies only;
+it does not expand transitive graphs or select versions for constraints.
+The batch fetch routes intentionally separate immutable metadata from markdown
+bytes so the public API stays batch-oriented and exact-read policy remains
+consistent across both read modes.

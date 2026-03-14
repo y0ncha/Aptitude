@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from pydantic import BaseModel, Field, model_validator
@@ -22,6 +23,9 @@ class PublishRuleSettings(BaseModel):
 
     required_scope: CallerScope
     provenance_required: bool = False
+
+
+SETTINGS_ENV_FILE_ENV_VAR = "APP_SETTINGS_ENV_FILE"
 
 
 def _default_publish_rules() -> dict[TrustTier, PublishRuleSettings]:
@@ -129,7 +133,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Return memoized settings for the running process."""
-    return Settings()  # type: ignore[call-arg]
+    return Settings(_env_file=os.getenv(SETTINGS_ENV_FILE_ENV_VAR, ".env"))  # type: ignore[call-arg]
 
 
 def reset_settings_cache() -> None:

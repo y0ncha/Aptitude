@@ -1,0 +1,60 @@
+$kind: http-request
+order: 9000
+
+method: POST
+url: '{{baseUrl}}/fetch/content:batch'
+
+headers:
+  - key: Accept
+    value: multipart/mixed
+    description: Request immutable markdown content as multipart
+  - key: Content-Type
+    value: application/json
+    description: Send the exact coordinate batch body
+  - key: Authorization
+    value: 'Bearer {{readToken}}'
+    description: Authenticate with a caller that has the `read` scope
+
+body:
+  type: json
+  content: |-
+    {
+      "coordinates": [
+        {
+          "slug": "{{sanity_primary_slug}}",
+          "version": "{{sanity_version_2}}"
+        },
+        {
+          "slug": "{{negative_missing_slug}}",
+          "version": "{{negative_missing_version}}"
+        }
+      ]
+    }
+
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const body = pm.response.text();
+
+      pm.test('Status is 200', () => {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Content batch returns multipart content with found and not_found parts', () => {
+        pm.expect(pm.response.headers.get('Content-Type')).to.include('multipart/mixed');
+        pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('sanity_primary_slug')}`);
+        pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('sanity_version_2')}`);
+        pm.expect(body).to.include('X-Aptitude-Status: found');
+        pm.expect(body).to.include('Cache-Control: public, immutable');
+        pm.expect(body).to.include('ETag:');
+        pm.expect(body).to.include('Postman Primary Skill v2');
+        pm.expect(body).to.include(pm.collectionVariables.get('runId'));
+        pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('negative_missing_slug')}`);
+        pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('negative_missing_version')}`);
+        pm.expect(body).to.include('X-Aptitude-Status: not_found');
+      });
+
+      pm.execution.setNextRequest(
+        pm.response.code === 200 ? 'Discover Published Skill Candidates' : null,
+      );

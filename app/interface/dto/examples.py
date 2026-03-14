@@ -1,4 +1,4 @@
-"""Shared OpenAPI request and response examples for the public API."""
+"""Shared request and response examples for the public API."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ CHECKSUM_EXAMPLE = {
     "digest": "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2",
 }
 
-SKILL_VERSION_RESPONSE_EXAMPLE = {
+SKILL_VERSION_METADATA_RESPONSE_EXAMPLE = {
     "slug": "python.lint",
     "version": "1.2.3",
     "version_checksum": CHECKSUM_EXAMPLE,
@@ -75,139 +75,46 @@ SKILL_VERSION_RESPONSE_EXAMPLE = {
         "commit_sha": "aabbccddeeff00112233445566778899aabbccdd",
         "tree_path": "skills/python.lint",
     },
-    "relationships": {
-        "depends_on": [
-            {
-                "selector": {
-                    "slug": "python.base",
-                    "version_constraint": ">=1.0.0,<2.0.0",
-                    "optional": True,
-                    "markers": ["linux", "gpu"],
-                },
-                "target_version": None,
-            }
-        ],
-        "extends": [
-            {
-                "selector": {"slug": "python.base", "version": "1.0.0", "markers": []},
-                "target_version": {
-                    "slug": "python.base",
-                    "version": "1.0.0",
-                    "name": "Python Base",
-                    "description": "Base runtime skill",
-                    "tags": ["python", "runtime"],
-                    "lifecycle_status": "published",
-                    "trust_tier": "verified",
-                    "published_at": "2026-03-01T08:30:00Z",
-                },
-            }
-        ],
-        "conflicts_with": [],
-        "overlaps_with": [
-            {
-                "selector": {"slug": "python.format", "version": "1.0.0", "markers": []},
-                "target_version": None,
-            }
-        ],
-    },
     "published_at": "2026-03-10T08:30:00Z",
-    "content_download_path": "/skills/python.lint/versions/1.2.3/content",
 }
 
-SKILL_IDENTITY_SUCCESS_EXAMPLE = {
-    "slug": "python.lint",
-    "status": "published",
-    "current_version": {
-        "version": "1.2.3",
-        "lifecycle_status": "published",
-        "trust_tier": "internal",
-        "published_at": "2026-03-10T08:30:00Z",
-    },
-    "created_at": "2026-02-10T08:30:00Z",
-    "updated_at": "2026-03-10T08:30:00Z",
+DISCOVERY_REQUEST_EXAMPLE = {
+    "name": "Python Lint",
+    "description": "Lint Python files consistently",
+    "tags": ["python", "lint"],
 }
 
-LIST_SUCCESS_EXAMPLE = {
+DISCOVERY_RESPONSE_EXAMPLE = {
+    "candidates": [
+        "python.lint",
+        "python.format",
+    ]
+}
+
+RESOLUTION_RESPONSE_EXAMPLE = {
     "slug": "python.lint",
-    "versions": [
+    "version": "1.2.3",
+    "depends_on": [
         {
-            "slug": "python.lint",
-            "version": "1.2.3",
-            "version_checksum": CHECKSUM_EXAMPLE,
-            "content": {
-                "checksum": CHECKSUM_EXAMPLE,
-                "size_bytes": 123,
-                "rendered_summary": "Lint Python files consistently.",
-            },
-            "metadata": {
-                "name": "Python Lint",
-                "description": "Linting skill",
-                "tags": ["python", "lint"],
-            },
-            "lifecycle_status": "published",
-            "trust_tier": "internal",
-            "published_at": "2026-03-10T08:30:00Z",
+            "slug": "python.base",
+            "version_constraint": ">=1.0.0,<2.0.0",
+            "optional": True,
+            "markers": ["linux", "gpu"],
         }
     ],
 }
 
-SEARCH_SUCCESS_EXAMPLE = {
-    "results": [
-        {
-            "slug": "python.lint",
-            "version": "1.2.3",
-            "name": "Python Lint",
-            "description": "Linting skill",
-            "tags": ["python", "lint"],
-            "lifecycle_status": "published",
-            "trust_tier": "internal",
-            "published_at": "2026-03-10T08:30:00Z",
-            "freshness_days": 0,
-            "content_size_bytes": 123,
-            "usage_count": 0,
-            "matched_fields": ["name", "tags"],
-            "matched_tags": ["python"],
-            "reasons": ["text_match", "tag_filter_match"],
-        }
-    ]
-}
-
-RELATIONSHIP_BATCH_SUCCESS_EXAMPLE = {
+METADATA_BATCH_RESPONSE_EXAMPLE = {
     "results": [
         {
             "status": "found",
             "coordinate": {"slug": "python.lint", "version": "1.2.3"},
-            "relationships": [
-                {
-                    "edge_type": "depends_on",
-                    "selector": {
-                        "slug": "python.base",
-                        "version_constraint": ">=1.0.0,<2.0.0",
-                        "optional": True,
-                        "markers": ["linux", "gpu"],
-                    },
-                    "target_version": None,
-                },
-                {
-                    "edge_type": "extends",
-                    "selector": {"slug": "python.base", "version": "1.0.0", "markers": []},
-                    "target_version": {
-                        "slug": "python.base",
-                        "version": "1.0.0",
-                        "name": "Python Base",
-                        "description": "Base runtime skill",
-                        "tags": ["python", "runtime"],
-                        "lifecycle_status": "published",
-                        "trust_tier": "verified",
-                        "published_at": "2026-03-01T08:30:00Z",
-                    },
-                },
-            ],
+            "item": SKILL_VERSION_METADATA_RESPONSE_EXAMPLE,
         },
         {
             "status": "not_found",
             "coordinate": {"slug": "python.missing", "version": "9.9.9"},
-            "relationships": None,
+            "item": None,
         },
     ]
 }
@@ -229,45 +136,11 @@ INVALID_REQUEST_ERROR_EXAMPLE = {
     }
 }
 
-SEARCH_INVALID_REQUEST_ERROR_EXAMPLE = {
-    "error": {
-        "code": "INVALID_REQUEST",
-        "message": "Search request validation failed.",
-        "details": {
-            "errors": [
-                {
-                    "type": "value_error",
-                    "loc": [],
-                    "msg": "Value error, At least one search selector must be provided.",
-                    "input": {
-                        "q": None,
-                        "tags": [],
-                        "language": None,
-                        "fresh_within_days": None,
-                        "max_content_size_bytes": None,
-                        "status": [],
-                        "trust_tier": [],
-                        "limit": 20,
-                    },
-                }
-            ]
-        },
-    }
-}
-
 DUPLICATE_SKILL_VERSION_ERROR_EXAMPLE = {
     "error": {
         "code": "DUPLICATE_SKILL_VERSION",
         "message": "Skill version already exists: python.lint@1.2.3",
         "details": {"slug": "python.lint", "version": "1.2.3"},
-    }
-}
-
-SKILL_NOT_FOUND_ERROR_EXAMPLE = {
-    "error": {
-        "code": "SKILL_NOT_FOUND",
-        "message": "Skill not found: python.lint",
-        "details": {"slug": "python.lint"},
     }
 }
 

@@ -12,7 +12,6 @@ from app.core.governance import (
     SkillGovernanceInput,
     TrustTier,
 )
-from app.core.ports import RelationshipEdgeType
 
 SHA256_ALGORITHM = "sha256"
 
@@ -129,25 +128,6 @@ class SkillVersionReference:
 
 
 @dataclass(frozen=True, slots=True)
-class SkillRelationship:
-    """One authored relationship plus optional exact target enrichment."""
-
-    edge_type: RelationshipEdgeType
-    selector: SkillRelationshipSelector
-    target_version: SkillVersionReference | None
-
-
-@dataclass(frozen=True, slots=True)
-class SkillVersionRelationships:
-    """Grouped relationships returned in exact fetch responses."""
-
-    depends_on: tuple[SkillRelationship, ...] = ()
-    extends: tuple[SkillRelationship, ...] = ()
-    conflicts_with: tuple[SkillRelationship, ...] = ()
-    overlaps_with: tuple[SkillRelationship, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
 class SkillVersionSummary:
     """Summary projection used by list and relationship responses."""
 
@@ -173,7 +153,6 @@ class SkillVersionDetail:
     lifecycle_status: LifecycleStatus
     trust_tier: TrustTier
     provenance: ProvenanceMetadata | None
-    relationships: SkillVersionRelationships
     published_at: datetime
 
 

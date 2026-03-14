@@ -14,14 +14,15 @@
 
 `aptitude-server` is the registry service in the Aptitude ecosystem. It stores immutable
 skill artifacts, structured metadata, direct relationship selectors, lifecycle state, and
-audit data in PostgreSQL so clients can publish exact versions, search indexed metadata,
-and fetch canonical content without crawling the full catalog.
+audit data in PostgreSQL so clients can publish exact versions, discover candidate slugs,
+read direct dependencies, and fetch immutable metadata and content without crawling the
+full catalog.
 
 ## Service Boundary
 
 This repository follows the boundary defined in [`docs/scope.md`](docs/scope.md):
 
-- Server owns data-local work: publish, fetch, list, search, governance, and audit.
+- Server owns data-local work: publish, discovery, resolution, fetch, governance, and audit.
 - Client owns decision-local work: prompt interpretation, reranking, final selection,
   dependency solving, lock generation, and execution planning.
 
@@ -34,13 +35,11 @@ In practice:
 
 The current codebase is registry-first and aligned with the PRD's core responsibilities:
 
-- FastAPI service with OpenAPI docs and PostgreSQL-backed persistence
+- FastAPI service with Swagger UI docs and PostgreSQL-backed persistence
 - Immutable publication of normalized `slug@version` records
-- Exact metadata fetch and raw markdown fetch for immutable versions
-- Indexed advisory discovery over descriptions, tags, language, trust tier, status, freshness,
-  and content-size filters
-- Direct relationship batch reads for authored `depends_on`, `extends`, `conflicts_with`, and
-  `overlaps_with` selectors
+- Body-based discovery that returns ordered candidate slugs
+- Exact dependency reads for authored `depends_on` selectors only
+- Ordered immutable metadata batch fetch and `multipart/mixed` content batch fetch
 - Lifecycle governance with `published`, `deprecated`, and `archived` states
 - Scoped Bearer-token authorization for `read`, `publish`, and `admin`
 - Optional publish-time provenance metadata (`repo_url`, `commit_sha`, `tree_path`)
@@ -76,27 +75,26 @@ HTTP surface implements those capabilities with the following routes:
 
 - `GET /healthz`
 - `GET /readyz`
-- `GET /discovery/skills/search`
-- `POST /resolution/relationships:batch`
+- `POST /discovery`
+- `GET /resolution/{slug}/{version}`
+- `POST /fetch/metadata:batch`
+- `POST /fetch/content:batch`
 - `POST /skill-versions`
-- `GET /skills/{slug}`
-- `GET /skills/{slug}/versions`
-- `GET /skills/{slug}/versions/{version}`
-- `GET /skills/{slug}/versions/{version}/content`
 - `PATCH /skills/{slug}/versions/{version}/status`
 
 Notes:
 
 - All non-health endpoints require `Authorization: Bearer <token>`.
 - `POST /skill-versions` is the current publish route for immutable version creation.
-- `GET /discovery/skills/search` is a discovery-only candidate-generation endpoint.
-- `POST /resolution/relationships:batch` returns only direct authored relationships, not a
-  solved graph.
-- `GET /skills/{slug}/versions/{version}/content` returns `ETag` and
-  `Cache-Control: public, immutable` headers derived from stored content.
+- `POST /discovery` is a discovery-only candidate-generation endpoint that returns slug
+  candidates only.
+- `GET /resolution/{slug}/{version}` returns only direct authored `depends_on`
+  declarations, not solved graphs or other relationship families.
+- `POST /fetch/content:batch` returns `multipart/mixed` with digest-backed `ETag`
+  and `Cache-Control: public, immutable` headers on found parts.
 
 When running locally, interactive docs are available at `http://127.0.0.1:8000/docs`.
-The pinned standalone contract is committed at `docs/openapi/repository-api-v1.json`.
+The human-readable API reference is [`docs/api-contract.md`](docs/api-contract.md).
 
 ## Governance and Auth
 
@@ -197,4 +195,4 @@ make db-down
 - Server/client boundary: [`docs/scope.md`](docs/scope.md)
 - Storage decision: [`docs/storage-strategy.md`](docs/storage-strategy.md)
 - Product and architecture overview: [`docs/overview.md`](docs/overview.md)
-- API contract: [`docs/openapi/repository-api-v1.json`](docs/openapi/repository-api-v1.json)
+- API contract: [`docs/api-contract.md`](docs/api-contract.md)

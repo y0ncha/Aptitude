@@ -51,14 +51,14 @@ def _stored_version() -> StoredSkillVersion:
 
 
 @pytest.mark.unit
-def test_to_skill_version_detail_groups_relationships_by_edge_type() -> None:
+def test_to_skill_version_detail_returns_immutable_metadata_without_relationships() -> None:
     detail = to_skill_version_detail(stored=_stored_version())
 
     assert detail.slug == "python.lint"
     assert detail.content.checksum.digest == "content-digest"
-    assert len(detail.relationships.depends_on) == 1
-    assert detail.relationships.depends_on[0].selector.slug == "python.base"
-    assert detail.relationships.extends == ()
+    assert detail.metadata.name == "Python Lint"
+    assert detail.lifecycle_status == "published"
+    assert detail.published_at == datetime(2026, 3, 13, 9, 0, tzinfo=UTC)
 
 
 @pytest.mark.unit

@@ -3,3 +3,12 @@ values:
   - key: baseUrl
     value: 'http://localhost:8000'
     enabled: true
+  - key: readToken
+    value: 'reader-token'
+    enabled: true
+  - key: publishToken
+    value: 'publisher-token'
+    enabled: true
+  - key: adminToken
+    value: 'admin-token'
+    enabled: true

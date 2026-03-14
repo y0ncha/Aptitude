@@ -15,9 +15,15 @@ def _resolve_level(level: str) -> int:
     return getattr(logging, level.upper(), DEFAULT_LOG_LEVEL)
 
 
+def _noisy_library_level(resolved_level: int) -> int:
+    """Clamp noisy framework loggers to WARNING unless the app runs in DEBUG."""
+    return logging.WARNING if resolved_level > logging.DEBUG else resolved_level
+
+
 def build_logging_config(level: str) -> dict[str, Any]:
     """Return logging config with one shared formatter across app and libraries."""
     resolved_level = _resolve_level(level)
+    noisy_library_level = _noisy_library_level(resolved_level)
     return {
         "version": 1,
         "disable_existing_loggers": False,
@@ -65,22 +71,22 @@ def build_logging_config(level: str) -> dict[str, Any]:
             },
             "watchfiles": {
                 "handlers": ["default"],
-                "level": resolved_level,
+                "level": noisy_library_level,
                 "propagate": False,
             },
             "watchfiles.main": {
                 "handlers": ["default"],
-                "level": resolved_level,
+                "level": noisy_library_level,
                 "propagate": False,
             },
             "sqlalchemy": {
                 "handlers": ["default"],
-                "level": resolved_level,
+                "level": noisy_library_level,
                 "propagate": False,
             },
             "psycopg": {
                 "handlers": ["default"],
-                "level": resolved_level,
+                "level": noisy_library_level,
                 "propagate": False,
             },
         },

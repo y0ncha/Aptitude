@@ -1,68 +1,85 @@
-"""HTTP contract for direct relationship-resolution read endpoints."""
+"""HTTP contract for exact first-degree dependency reads."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Path, status
+from fastapi.responses import JSONResponse
 
-from app.core.dependencies import ReadCallerDep, SkillRelationshipServiceDep
-from app.core.ports import ExactSkillCoordinate
-from app.interface.api.skill_api_support import to_relationship_batch_item_response
+from app.core.dependencies import ReadCallerDep, SkillResolutionServiceDep
+from app.core.skill_models import SkillVersionNotFoundError
+from app.interface.api.errors import error_response
+from app.interface.api.skill_api_support import to_dependency_resolution_response
 from app.interface.dto.errors import ErrorEnvelope
 from app.interface.dto.examples import (
     INVALID_REQUEST_ERROR_EXAMPLE,
-    RELATIONSHIP_BATCH_SUCCESS_EXAMPLE,
+    RESOLUTION_RESPONSE_EXAMPLE,
+    SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
 )
-from app.interface.dto.skills import (
-    SkillRelationshipBatchRequest,
-    SkillRelationshipBatchResponse,
-)
+from app.interface.dto.skills import SkillDependencyResolutionResponse
+from app.interface.validation import SEMVER_PATTERN, SLUG_PATTERN
 
 router = APIRouter(tags=["resolution"])
 
-OpenAPIResponses = dict[int | str, dict[str, Any]]
+ApiResponses = dict[int | str, dict[str, Any]]
 
-RELATIONSHIP_RESPONSES: OpenAPIResponses = {
+RESOLUTION_RESPONSES: ApiResponses = {
     status.HTTP_200_OK: {
-        "description": "Ordered direct relationship results returned successfully.",
-        "content": {"application/json": {"example": RELATIONSHIP_BATCH_SUCCESS_EXAMPLE}},
+        "description": "Direct dependency declarations returned successfully.",
+        "content": {"application/json": {"example": RESOLUTION_RESPONSE_EXAMPLE}},
+    },
+    status.HTTP_404_NOT_FOUND: {
+        "model": ErrorEnvelope,
+        "description": "The requested immutable `slug@version` does not exist.",
+        "content": {"application/json": {"example": SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE}},
     },
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
         "model": ErrorEnvelope,
-        "description": "The relationship query request is invalid.",
+        "description": "The path parameters are invalid.",
         "content": {"application/json": {"example": INVALID_REQUEST_ERROR_EXAMPLE}},
     },
 }
 
 
-@router.post(
-    "/resolution/relationships:batch",
-    operation_id="batchGetDirectSkillRelationships",
-    summary="Read direct immutable relationships",
+@router.get(
+    "/resolution/{slug}/{version}",
+    operation_id="getDirectDependencies",
+    summary="Read direct immutable dependencies",
     description=(
-        "Return authored direct `depends_on` and `extends` relationships for exact immutable "
-        "source versions. This route does not expand transitive graphs, select versions for "
-        "constraints, or emit solved dependency closures."
+        "Return authored direct `depends_on` declarations for one exact immutable version. "
+        "This route does not recurse, solve version constraints, or return non-dependency "
+        "relationship families."
     ),
-    response_model=SkillRelationshipBatchResponse,
+    response_model=SkillDependencyResolutionResponse,
     response_model_exclude_unset=True,
-    responses=RELATIONSHIP_RESPONSES,
+    responses=RESOLUTION_RESPONSES,
 )
-def batch_get_relationships(
-    request: SkillRelationshipBatchRequest,
-    relationship_service: SkillRelationshipServiceDep,
+def get_direct_dependencies(
+    slug: Annotated[
+        str,
+        Path(pattern=SLUG_PATTERN, description="Stable public slug of the skill to resolve."),
+    ],
+    version: Annotated[
+        str,
+        Path(pattern=SEMVER_PATTERN, description="Exact immutable semantic version to resolve."),
+    ],
+    resolution_service: SkillResolutionServiceDep,
     caller: ReadCallerDep,
-) -> SkillRelationshipBatchResponse:
-    """Return direct authored relationships in request order."""
-    results = relationship_service.get_direct_relationships(
-        caller=caller,
-        coordinates=tuple(
-            ExactSkillCoordinate(slug=item.slug, version=item.version)
-            for item in request.coordinates
-        ),
-        edge_types=tuple(request.edge_types),
-    )
-    return SkillRelationshipBatchResponse(
-        results=[to_relationship_batch_item_response(item=item) for item in results]
-    )
+) -> SkillDependencyResolutionResponse | JSONResponse:
+    """Return direct dependency selectors exactly as authored."""
+    try:
+        resolved = resolution_service.get_direct_dependencies(
+            caller=caller,
+            slug=slug,
+            version=version,
+        )
+    except SkillVersionNotFoundError as exc:
+        return error_response(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="SKILL_VERSION_NOT_FOUND",
+            message=str(exc),
+            details={"slug": exc.slug, "version": exc.version},
+        )
+
+    return to_dependency_resolution_response(resolved)

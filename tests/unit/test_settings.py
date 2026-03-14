@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from app.core.governance import build_default_policy_profile
-from app.core.settings import Settings
+from app.core.settings import Settings, get_settings
 
 
 @pytest.mark.unit
@@ -38,3 +41,66 @@ def test_settings_require_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+@pytest.mark.unit
+def test_settings_load_auth_tokens_from_dotenv_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AUTH_TOKENS_JSON", raising=False)
+    auth_tokens = {
+        "reader-token": ["read"],
+        "publisher-token": ["read", "publish"],
+    }
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "DATABASE_URL=postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude",
+                f"AUTH_TOKENS_JSON={json.dumps(auth_tokens)}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    settings = Settings(_env_file=env_file)
+
+    assert settings.auth_tokens == {
+        "reader-token": ("read",),
+        "publisher-token": ("read", "publish"),
+    }
+
+
+@pytest.mark.unit
+def test_get_settings_uses_configured_dotenv_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("AUTH_TOKENS_JSON", raising=False)
+    auth_tokens = {
+        "reader-token": ["read"],
+        "publisher-token": ["read", "publish"],
+    }
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "DATABASE_URL=postgresql+psycopg://postgres:postgres@127.0.0.1:5432/aptitude",
+                f"AUTH_TOKENS_JSON={json.dumps(auth_tokens)}",
+                "APP_ENV=test",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("APP_SETTINGS_ENV_FILE", str(env_file))
+
+    settings = get_settings()
+
+    assert settings.database_url.endswith("/aptitude")
+    assert settings.auth_tokens == {
+        "reader-token": ("read",),
+        "publisher-token": ("read", "publish"),
+    }
+    assert settings.app_env == "test"

@@ -1,8 +1,13 @@
 $kind: http-request
+name: Publish Dependency Skill
+auth:
+  type: bearer
+  credentials:
+    token: publisher-token
 order: 3000
 
 method: POST
-url: '{{baseUrl}}/skill-versions'
+url: "{{baseUrl}}/skill-versions"
 
 headers:
   - key: Accept
@@ -11,10 +16,13 @@ headers:
   - key: Content-Type
     value: application/json
     description: Send the normalized JSON publish contract
+  - key: Authorization
+    value: Bearer {{publishToken}}
+    description: Authenticate with a caller that has the `publish` scope
 
 body:
   type: json
-  content: |-
+  content: >-
     {
       "slug": "{{sanity_dependency_slug}}",
       "version": "{{sanity_version_1}}",
@@ -49,17 +57,21 @@ body:
 
 scripts:
   - type: afterResponse
-    language: text/javascript
-    code: |-
+    code: >-
       const json = pm.response.json();
+
 
       pm.test('Status is 201', () => {
         pm.response.to.have.status(201);
       });
+
 
       pm.test('Dependency skill publish returns the created version', () => {
         pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_dependency_slug'));
         pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_1'));
       });
 
-      pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Extension Skill' : null);
+
+      pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Extension
+      Skill' : null);
+    language: text/javascript

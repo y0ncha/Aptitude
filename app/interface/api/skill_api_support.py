@@ -6,50 +6,37 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
-from app.core.skill_registry import (
+from app.core.skill_fetch import SkillVersionMetadataBatchItem
+from app.core.skill_models import (
     CreateSkillVersionCommand,
     ProvenanceMetadata,
     SkillChecksum,
     SkillContentInput,
     SkillGovernanceInput,
-    SkillIdentity,
     SkillMetadata,
     SkillMetadataInput,
-    SkillRelationship,
     SkillRelationshipSelector,
     SkillRelationshipsInput,
     SkillVersionDetail,
-    SkillVersionReference,
     SkillVersionStatusUpdate,
-    SkillVersionSummary,
 )
-from app.core.skill_relationships import SkillRelationshipBatchItem
-from app.core.skill_search import SkillSearchResult
+from app.core.skill_resolution import ResolvedSkillDependencies
 from app.interface.api.errors import serialize_validation_errors
 from app.interface.dto.skills import (
     ChecksumResponse,
-    CurrentSkillVersionResponse,
     DependencySelectorRequest,
+    DependencySelectorResponse,
     ExactRelationshipSelectorRequest,
     ProvenanceResponse,
-    RelationshipSelectorResponse,
     SkillContentSummaryResponse,
+    SkillDependencyResolutionResponse,
     SkillGovernanceRequest,
-    SkillIdentityResponse,
     SkillMetadataResponse,
-    SkillMetadataSummaryResponse,
-    SkillRelationshipBatchItemResponse,
-    SkillRelationshipEdgeResponse,
-    SkillRelationshipResponse,
-    SkillSearchResultResponse,
     SkillVersionCoordinateRequest,
     SkillVersionCreateRequest,
-    SkillVersionListResponse,
-    SkillVersionReferenceResponse,
-    SkillVersionRelationshipsResponse,
-    SkillVersionResponse,
+    SkillVersionMetadataBatchItemResponse,
+    SkillVersionMetadataResponse,
     SkillVersionStatusResponse,
-    SkillVersionSummaryResponse,
 )
 
 
@@ -94,29 +81,9 @@ def to_create_command(request: SkillVersionCreateRequest) -> CreateSkillVersionC
     )
 
 
-def to_skill_identity_response(identity: SkillIdentity) -> SkillIdentityResponse:
-    """Convert a core identity projection into the public response schema."""
-    return SkillIdentityResponse(
-        slug=identity.slug,
-        status=identity.status,
-        current_version=(
-            None
-            if identity.current_version is None
-            else CurrentSkillVersionResponse(
-                version=identity.current_version.version,
-                lifecycle_status=identity.current_version.lifecycle_status,
-                trust_tier=identity.current_version.trust_tier,
-                published_at=identity.current_version.published_at,
-            )
-        ),
-        created_at=identity.created_at,
-        updated_at=identity.updated_at,
-    )
-
-
-def to_version_response(detail: SkillVersionDetail) -> SkillVersionResponse:
-    """Convert a core detail projection into the exact metadata response schema."""
-    return SkillVersionResponse(
+def to_metadata_response(detail: SkillVersionDetail) -> SkillVersionMetadataResponse:
+    """Convert a core detail projection into the immutable metadata response schema."""
+    return SkillVersionMetadataResponse(
         slug=detail.slug,
         version=detail.version,
         version_checksum=_checksum_response(detail.version_checksum),
@@ -129,118 +96,43 @@ def to_version_response(detail: SkillVersionDetail) -> SkillVersionResponse:
         lifecycle_status=detail.lifecycle_status,
         trust_tier=detail.trust_tier,
         provenance=_provenance_response(detail.provenance),
-        relationships=SkillVersionRelationshipsResponse(
-            depends_on=[_relationship_response(item) for item in detail.relationships.depends_on],
-            extends=[_relationship_response(item) for item in detail.relationships.extends],
-            conflicts_with=[
-                _relationship_response(item) for item in detail.relationships.conflicts_with
-            ],
-            overlaps_with=[
-                _relationship_response(item) for item in detail.relationships.overlaps_with
-            ],
-        ),
         published_at=detail.published_at,
-        content_download_path=content_download_path(slug=detail.slug, version=detail.version),
     )
 
 
-def to_version_summary_response(summary: SkillVersionSummary) -> SkillVersionSummaryResponse:
-    """Convert a core version summary into the version-list response schema."""
-    return SkillVersionSummaryResponse(
-        slug=summary.slug,
-        version=summary.version,
-        version_checksum=_checksum_response(summary.version_checksum),
-        content=_content_summary_response(
-            summary.content.checksum,
-            summary.content.size_bytes,
-            summary.content.rendered_summary,
-        ),
-        metadata=SkillMetadataSummaryResponse(
-            name=summary.metadata.name,
-            description=summary.metadata.description,
-            tags=list(summary.metadata.tags),
-        ),
-        lifecycle_status=summary.lifecycle_status,
-        trust_tier=summary.trust_tier,
-        published_at=summary.published_at,
-    )
-
-
-def to_version_list_response(
-    *,
-    slug: str,
-    versions: tuple[SkillVersionSummary, ...],
-) -> SkillVersionListResponse:
-    """Build the deterministic version-list response."""
-    return SkillVersionListResponse(
-        slug=slug,
-        versions=[to_version_summary_response(item) for item in versions],
-    )
-
-
-def to_related_version_response(reference: SkillVersionReference) -> SkillVersionReferenceResponse:
-    """Convert a compact exact version reference into the public schema."""
-    return SkillVersionReferenceResponse(
-        slug=reference.slug,
-        version=reference.version,
-        name=reference.name,
-        description=reference.description,
-        tags=list(reference.tags),
-        lifecycle_status=reference.lifecycle_status,
-        trust_tier=reference.trust_tier,
-        published_at=reference.published_at,
-    )
-
-
-def to_relationship_batch_item_response(
-    *,
-    item: SkillRelationshipBatchItem,
-) -> SkillRelationshipBatchItemResponse:
-    """Convert one relationship batch item into the public schema."""
+def to_metadata_batch_item_response(
+    item: SkillVersionMetadataBatchItem,
+) -> SkillVersionMetadataBatchItemResponse:
+    """Convert one immutable metadata batch item into the public schema."""
     status: Literal["found", "not_found"]
-    status = "not_found" if item.relationships is None else "found"
-    return SkillRelationshipBatchItemResponse(
+    status = "not_found" if item.item is None else "found"
+    return SkillVersionMetadataBatchItemResponse(
         status=status,
         coordinate=SkillVersionCoordinateRequest(
             slug=item.coordinate.slug,
             version=item.coordinate.version,
         ),
-        relationships=(
-            None
-            if item.relationships is None
-            else [
-                SkillRelationshipEdgeResponse(
-                    edge_type=relationship.edge_type,
-                    selector=_selector_response(relationship.selector),
-                    target_version=(
-                        None
-                        if relationship.target_version is None
-                        else to_related_version_response(relationship.target_version)
-                    ),
-                )
-                for relationship in item.relationships
-            ]
-        ),
+        item=None if item.item is None else to_metadata_response(item.item),
     )
 
 
-def to_search_result_response(item: SkillSearchResult) -> SkillSearchResultResponse:
-    """Convert a core search result into the compact HTTP search card."""
-    return SkillSearchResultResponse(
-        slug=item.slug,
-        version=item.version,
-        name=item.name,
-        description=item.description,
-        tags=list(item.tags),
-        lifecycle_status=item.lifecycle_status,
-        trust_tier=item.trust_tier,
-        published_at=item.published_at,
-        freshness_days=item.freshness_days,
-        content_size_bytes=item.content_size_bytes,
-        usage_count=item.usage_count,
-        matched_fields=list(item.matched_fields),
-        matched_tags=list(item.matched_tags),
-        reasons=list(item.reasons),
+def to_dependency_resolution_response(
+    resolved: ResolvedSkillDependencies,
+) -> SkillDependencyResolutionResponse:
+    """Convert resolved dependencies into the public response payload."""
+    return SkillDependencyResolutionResponse(
+        slug=resolved.slug,
+        version=resolved.version,
+        depends_on=[
+            DependencySelectorResponse(
+                slug=item.slug,
+                version=item.version,
+                version_constraint=item.version_constraint,
+                optional=item.optional,
+                markers=list(item.markers),
+            )
+            for item in resolved.depends_on
+        ],
     )
 
 
@@ -254,11 +146,6 @@ def to_version_status_response(update: SkillVersionStatusUpdate) -> SkillVersion
         lifecycle_changed_at=update.lifecycle_changed_at,
         is_current_default=update.is_current_default,
     )
-
-
-def content_download_path(*, slug: str, version: str) -> str:
-    """Return the stable API path clients should call to download markdown content."""
-    return f"/skills/{slug}/versions/{version}/content"
 
 
 def _dependency_selector(item: DependencySelectorRequest) -> SkillRelationshipSelector:
@@ -327,25 +214,4 @@ def _provenance_response(provenance: ProvenanceMetadata | None) -> ProvenanceRes
         repo_url=provenance.repo_url,
         commit_sha=provenance.commit_sha,
         tree_path=provenance.tree_path,
-    )
-
-
-def _selector_response(selector: SkillRelationshipSelector) -> RelationshipSelectorResponse:
-    return RelationshipSelectorResponse(
-        slug=selector.slug,
-        version=selector.version,
-        version_constraint=selector.version_constraint,
-        optional=selector.optional,
-        markers=list(selector.markers),
-    )
-
-
-def _relationship_response(relationship: SkillRelationship) -> SkillRelationshipResponse:
-    return SkillRelationshipResponse(
-        selector=_selector_response(relationship.selector),
-        target_version=(
-            None
-            if relationship.target_version is None
-            else to_related_version_response(relationship.target_version)
-        ),
     )

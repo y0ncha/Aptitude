@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from app.core.ports import (
-    RelationshipEdgeType,
     StoredSkillIdentity,
     StoredSkillVersion,
     StoredSkillVersionSummary,
@@ -13,11 +12,8 @@ from app.core.skill_models import (
     SkillChecksum,
     SkillContentSummary,
     SkillMetadata,
-    SkillRelationship,
-    SkillRelationshipSelector,
     SkillVersionDetail,
     SkillVersionReference,
-    SkillVersionRelationships,
     SkillVersionSummary,
 )
 
@@ -71,7 +67,6 @@ def to_skill_version_detail(*, stored: StoredSkillVersion) -> SkillVersionDetail
         lifecycle_status=stored.lifecycle_status,
         trust_tier=stored.trust_tier,
         provenance=stored.provenance,
-        relationships=_group_relationships(stored=stored),
         published_at=summary.published_at,
     )
 
@@ -117,34 +112,4 @@ def to_current_version_reference(
         lifecycle_status=summary.lifecycle_status,
         trust_tier=summary.trust_tier,
         published_at=summary.published_at,
-    )
-
-
-def _group_relationships(*, stored: StoredSkillVersion) -> SkillVersionRelationships:
-    grouped: dict[RelationshipEdgeType, list[SkillRelationship]] = {
-        "depends_on": [],
-        "extends": [],
-        "conflicts_with": [],
-        "overlaps_with": [],
-    }
-    for selector in stored.relationships:
-        grouped[selector.edge_type].append(
-            SkillRelationship(
-                edge_type=selector.edge_type,
-                selector=SkillRelationshipSelector(
-                    slug=selector.slug,
-                    version=selector.version,
-                    version_constraint=selector.version_constraint,
-                    optional=selector.optional,
-                    markers=selector.markers,
-                ),
-                target_version=None,
-            )
-        )
-
-    return SkillVersionRelationships(
-        depends_on=tuple(grouped["depends_on"]),
-        extends=tuple(grouped["extends"]),
-        conflicts_with=tuple(grouped["conflicts_with"]),
-        overlaps_with=tuple(grouped["overlaps_with"]),
     )

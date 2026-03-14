@@ -21,9 +21,13 @@ def test_build_logging_config_uses_shared_format_for_app_and_libraries() -> None
     assert config["loggers"]["app"]["level"] == logging.INFO
     assert config["loggers"]["uvicorn.error"]["handlers"] == ["default"]
     assert config["loggers"]["uvicorn.error"]["propagate"] is False
+    assert config["loggers"]["uvicorn.access"]["level"] == logging.INFO
     assert config["loggers"]["uvicorn.access"]["propagate"] is False
+    assert config["loggers"]["watchfiles"]["level"] == logging.WARNING
     assert config["loggers"]["sqlalchemy"]["handlers"] == ["default"]
+    assert config["loggers"]["sqlalchemy"]["level"] == logging.WARNING
     assert config["loggers"]["psycopg"]["handlers"] == ["default"]
+    assert config["loggers"]["psycopg"]["level"] == logging.WARNING
 
 
 @pytest.mark.unit
@@ -45,3 +49,13 @@ def test_configure_logging_wires_root_and_library_loggers_to_stdout() -> None:
     assert uvicorn_error_logger.handlers[0].stream is sys.stdout
     assert uvicorn_error_logger.handlers[0].formatter is not None
     assert uvicorn_error_logger.handlers[0].formatter._fmt == LOG_FORMAT  # noqa: SLF001
+
+
+@pytest.mark.unit
+def test_build_logging_config_keeps_noisy_libraries_verbose_in_debug() -> None:
+    config = build_logging_config("DEBUG")
+
+    assert config["loggers"]["uvicorn.access"]["level"] == logging.DEBUG
+    assert config["loggers"]["watchfiles"]["level"] == logging.DEBUG
+    assert config["loggers"]["sqlalchemy"]["level"] == logging.DEBUG
+    assert config["loggers"]["psycopg"]["level"] == logging.DEBUG

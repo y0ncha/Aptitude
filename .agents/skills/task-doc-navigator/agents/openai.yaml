@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Doc Navigator"
+  short_description: "Map tasks to the smallest relevant sources"
+  default_prompt: "Use $task-doc-navigator to gather the most relevant sources for this task before making changes."

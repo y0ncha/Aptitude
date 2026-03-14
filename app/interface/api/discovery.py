@@ -1,131 +1,66 @@
-"""HTTP contract for advisory discovery endpoints."""
+"""HTTP contract for body-based discovery candidate lookup."""
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, Query, status
-from fastapi.responses import JSONResponse
-from pydantic import ValidationError
+from fastapi import APIRouter, status
 
 from app.core.dependencies import ReadCallerDep, SkillDiscoveryServiceDep
-from app.core.skill_search import SkillSearchQuery
-from app.interface.api.errors import error_response
-from app.interface.api.skill_api_support import to_search_result_response, validation_errors
+from app.core.skill_discovery import SkillDiscoveryRequest as CoreSkillDiscoveryRequest
 from app.interface.dto.errors import ErrorEnvelope
 from app.interface.dto.examples import (
+    DISCOVERY_REQUEST_EXAMPLE,
+    DISCOVERY_RESPONSE_EXAMPLE,
     INVALID_REQUEST_ERROR_EXAMPLE,
-    SEARCH_INVALID_REQUEST_ERROR_EXAMPLE,
-    SEARCH_SUCCESS_EXAMPLE,
 )
-from app.interface.dto.skills import (
-    LifecycleStatus,
-    SkillSearchRequest,
-    SkillSearchResponse,
-    TrustTier,
-)
+from app.interface.dto.skills import SkillDiscoveryRequest, SkillDiscoveryResponse
 
 router = APIRouter(tags=["discovery"])
 
-OpenAPIResponses = dict[int | str, dict[str, Any]]
+ApiResponses = dict[int | str, dict[str, Any]]
 
-SEARCH_RESPONSES: OpenAPIResponses = {
+DISCOVERY_RESPONSES: ApiResponses = {
     status.HTTP_200_OK: {
-        "description": "Compact advisory skill candidates returned successfully.",
-        "content": {"application/json": {"example": SEARCH_SUCCESS_EXAMPLE}},
+        "description": "Ordered candidate slugs returned successfully.",
+        "content": {"application/json": {"example": DISCOVERY_RESPONSE_EXAMPLE}},
     },
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
         "model": ErrorEnvelope,
         "description": "The discovery request is invalid.",
-        "content": {
-            "application/json": {
-                "examples": {
-                    "invalid_request": {"value": INVALID_REQUEST_ERROR_EXAMPLE},
-                    "missing_selector": {"value": SEARCH_INVALID_REQUEST_ERROR_EXAMPLE},
-                }
-            }
-        },
+        "content": {"application/json": {"example": INVALID_REQUEST_ERROR_EXAMPLE}},
     },
 }
 
 
-@router.get(
-    "/discovery/skills/search",
-    operation_id="searchDiscoverySkills",
-    summary="Search skill discovery metadata",
+@router.post(
+    "/discovery",
+    operation_id="discoverSkillCandidates",
+    summary="Discover candidate skill slugs",
     description=(
-        "Return compact advisory candidates from indexed metadata and description search. "
-        "This route is discovery-only: it does not resolve relationships, choose a final "
-        "candidate, or perform dependency solving."
+        "Return ordered candidate slugs from indexed metadata and description search. "
+        "This route is discovery-only: it does not resolve dependencies, choose a final "
+        "candidate, or perform solver behavior."
     ),
-    response_model=SkillSearchResponse,
+    response_model=SkillDiscoveryResponse,
     response_model_exclude_unset=True,
-    responses=SEARCH_RESPONSES,
+    responses=DISCOVERY_RESPONSES,
+    openapi_extra={
+        "requestBody": {"content": {"application/json": {"example": DISCOVERY_REQUEST_EXAMPLE}}}
+    },
 )
-def search_skills(
+def discover_skills(
+    request: SkillDiscoveryRequest,
     discovery_service: SkillDiscoveryServiceDep,
     caller: ReadCallerDep,
-    q: Annotated[str | None, Query(description="Full-text discovery query.")] = None,
-    tag: Annotated[
-        list[str] | None,
-        Query(description="Repeatable tag filter; all values must match."),
-    ] = None,
-    language: Annotated[
-        str | None,
-        Query(description="Language alias filter implemented as a normalized tag."),
-    ] = None,
-    fresh_within_days: Annotated[
-        int | None,
-        Query(ge=0, description="Maximum age in days since publication."),
-    ] = None,
-    max_content_size_bytes: Annotated[
-        int | None,
-        Query(ge=0, description="Maximum allowed markdown size in bytes."),
-    ] = None,
-    lifecycle_status: Annotated[
-        list[LifecycleStatus] | None,
-        Query(alias="status", description="Repeatable lifecycle-state filter."),
-    ] = None,
-    trust_tier: Annotated[
-        list[TrustTier] | None,
-        Query(description="Repeatable trust-tier filter."),
-    ] = None,
-    limit: Annotated[
-        int,
-        Query(ge=1, le=50, description="Maximum number of skill candidates to return."),
-    ] = 20,
-) -> SkillSearchResponse | JSONResponse:
-    """Search indexed metadata and return compact advisory candidates."""
-    try:
-        request = SkillSearchRequest(
-            q=q,
-            tags=tag or [],
-            language=language,
-            fresh_within_days=fresh_within_days,
-            max_content_size_bytes=max_content_size_bytes,
-            status=lifecycle_status or [],
-            trust_tier=trust_tier or [],
-            limit=limit,
-        )
-    except ValidationError as exc:
-        return error_response(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            code="INVALID_REQUEST",
-            message="Search request validation failed.",
-            details={"errors": validation_errors(exc)},
-        )
-
-    results = discovery_service.search(
+) -> SkillDiscoveryResponse:
+    """Return ordered candidate slugs for the provided discovery request."""
+    candidates = discovery_service.discover_candidates(
         caller=caller,
-        query=SkillSearchQuery(
-            q=request.q,
+        request=CoreSkillDiscoveryRequest(
+            name=request.name,
+            description=request.description,
             tags=tuple(request.tags),
-            language=request.language,
-            fresh_within_days=request.fresh_within_days,
-            max_footprint_bytes=request.max_content_size_bytes,
-            status=tuple(request.status),
-            trust_tier=tuple(request.trust_tier),
-            limit=request.limit,
         ),
     )
-    return SkillSearchResponse(results=[to_search_result_response(item) for item in results])
+    return SkillDiscoveryResponse(candidates=list(candidates))

@@ -1,4 +1,4 @@
-"""Normalized skill registry DTOs."""
+"""Public request and response DTOs for skill APIs."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.core.governance import LifecycleStatus, TrustTier
-from app.core.ports import RelationshipEdgeType
 from app.interface.validation import (
     MARKER_PATTERN,
     MAX_BATCH_ITEMS,
@@ -20,8 +19,16 @@ from app.interface.validation import (
 BatchItemStatus = Literal["found", "not_found"]
 
 
-def _default_relationship_edge_types() -> list[RelationshipEdgeType]:
-    return ["depends_on", "extends", "conflicts_with", "overlaps_with"]
+def _normalize_unique_tags(value: list[str]) -> list[str]:
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for item in value:
+        tag = item.strip()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        normalized.append(tag)
+    return normalized
 
 
 class SkillVersionCoordinateRequest(BaseModel):
@@ -95,6 +102,32 @@ class DependencySelectorRequest(BaseModel):
                     "of semver comparators."
                 )
         return self
+
+
+class DependencySelectorResponse(BaseModel):
+    """Direct dependency selector returned by resolution."""
+
+    slug: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=SLUG_PATTERN,
+        description="Stable public slug of the dependency skill.",
+    )
+    version: str | None = Field(
+        default=None,
+        pattern=SEMVER_PATTERN,
+        description="Exact immutable dependency version.",
+    )
+    version_constraint: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        description="Comma-separated semver comparators.",
+    )
+    optional: bool | None = Field(default=None)
+    markers: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExactRelationshipSelectorRequest(BaseModel):
@@ -173,7 +206,7 @@ class SkillVersionMetadataRequest(BaseModel):
     @field_validator("tags")
     @classmethod
     def normalize_tags(cls, value: list[str]) -> list[str]:
-        return [item.strip() for item in value if item.strip()]
+        return _normalize_unique_tags(value)
 
 
 class SkillVersionRelationshipsRequest(BaseModel):
@@ -246,17 +279,12 @@ class SkillContentSummaryResponse(BaseModel):
     )
 
 
-class SkillMetadataSummaryResponse(BaseModel):
-    """Compact metadata summary used in list and relationship responses."""
+class SkillMetadataResponse(BaseModel):
+    """Full normalized metadata block returned by immutable metadata reads."""
 
     name: str
     description: str | None
     tags: list[str]
-
-
-class SkillMetadataResponse(SkillMetadataSummaryResponse):
-    """Full normalized metadata block returned by exact fetch responses."""
-
     headers: dict[str, Any] | None = None
     inputs_schema: dict[str, Any] | None = None
     outputs_schema: dict[str, Any] | None = None
@@ -266,70 +294,15 @@ class SkillMetadataResponse(SkillMetadataSummaryResponse):
 
 
 class ProvenanceResponse(BaseModel):
-    """Minimal provenance returned by exact version reads."""
+    """Minimal provenance returned by immutable version reads."""
 
     repo_url: str
     commit_sha: str
     tree_path: str | None = None
 
 
-class RelationshipSelectorResponse(BaseModel):
-    """Authored relationship selector preserved exactly as published."""
-
-    slug: str = Field(
-        min_length=1,
-        max_length=128,
-        pattern=SLUG_PATTERN,
-        description="Stable public slug of the related skill.",
-    )
-    version: str | None = Field(
-        default=None,
-        pattern=SEMVER_PATTERN,
-        description="Exact related version when the selector targets one immutable version.",
-    )
-    version_constraint: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=200,
-        description="Authored dependency constraint when the selector is version-ranged.",
-    )
-    optional: bool | None = Field(default=None)
-    markers: list[str] = Field(default_factory=list)
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class SkillVersionReferenceResponse(BaseModel):
-    """Compact exact version reference."""
-
-    slug: str
-    version: str
-    name: str
-    description: str | None
-    tags: list[str]
-    lifecycle_status: LifecycleStatus
-    trust_tier: TrustTier
-    published_at: datetime
-
-
-class SkillRelationshipResponse(BaseModel):
-    """One authored relationship plus optional exact target enrichment."""
-
-    selector: RelationshipSelectorResponse
-    target_version: SkillVersionReferenceResponse | None = None
-
-
-class SkillVersionRelationshipsResponse(BaseModel):
-    """Grouped relationships returned in exact fetch responses."""
-
-    depends_on: list[SkillRelationshipResponse] = Field(default_factory=list)
-    extends: list[SkillRelationshipResponse] = Field(default_factory=list)
-    conflicts_with: list[SkillRelationshipResponse] = Field(default_factory=list)
-    overlaps_with: list[SkillRelationshipResponse] = Field(default_factory=list)
-
-
-class SkillVersionResponse(BaseModel):
-    """Normalized exact immutable version metadata response."""
+class SkillVersionMetadataResponse(BaseModel):
+    """Immutable metadata envelope returned by publish and metadata batch fetch."""
 
     slug: str
     version: str
@@ -339,84 +312,29 @@ class SkillVersionResponse(BaseModel):
     lifecycle_status: LifecycleStatus
     trust_tier: TrustTier
     provenance: ProvenanceResponse | None = None
-    relationships: SkillVersionRelationshipsResponse
-    published_at: datetime
-    content_download_path: str
-
-
-class SkillVersionSummaryResponse(BaseModel):
-    """Summary view for one immutable version in version-list and batch responses."""
-
-    slug: str
-    version: str
-    version_checksum: ChecksumResponse
-    content: SkillContentSummaryResponse
-    metadata: SkillMetadataSummaryResponse
-    lifecycle_status: LifecycleStatus
-    trust_tier: TrustTier
     published_at: datetime
 
 
-class CurrentSkillVersionResponse(BaseModel):
-    """Current default version pointer for a skill identity."""
+class SkillDiscoveryRequest(BaseModel):
+    """Body-based discovery request."""
 
-    version: str
-    lifecycle_status: LifecycleStatus
-    trust_tier: TrustTier
-    published_at: datetime
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
 
+    model_config = ConfigDict(extra="forbid")
 
-class SkillIdentityResponse(BaseModel):
-    """Logical skill identity response."""
-
-    slug: str
-    status: LifecycleStatus
-    current_version: CurrentSkillVersionResponse | None
-    created_at: datetime
-    updated_at: datetime
-
-
-class SkillVersionListResponse(BaseModel):
-    """Deterministic version list for one skill identity."""
-
-    slug: str
-    versions: list[SkillVersionSummaryResponse]
-
-
-class SkillSearchRequest(BaseModel):
-    """Validated query shape for advisory search requests."""
-
-    q: str | None = Field(
-        default=None,
-        description="Optional full-text query over slugs, names, tags, and descriptions.",
-    )
-    tags: list[str] = Field(
-        default_factory=list,
-        description="Repeated tag filters. Every provided tag must be present on a result.",
-    )
-    language: str | None = Field(
-        default=None,
-        description="Convenience alias for filtering by a language tag.",
-    )
-    fresh_within_days: int | None = Field(default=None, ge=0)
-    max_content_size_bytes: int | None = Field(
-        default=None,
-        ge=0,
-        description="Optional maximum markdown size in bytes.",
-    )
-    status: list[LifecycleStatus] = Field(
-        default_factory=list,
-        description="Repeatable lifecycle-state filter.",
-    )
-    trust_tier: list[TrustTier] = Field(
-        default_factory=list,
-        description="Repeatable trust-tier filter.",
-    )
-    limit: int = Field(default=20, ge=1, le=50)
-
-    @field_validator("q", "language")
+    @field_validator("name")
     @classmethod
-    def normalize_optional_text(cls, value: str | None) -> str | None:
+    def normalize_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Discovery `name` must not be blank.")
+        return normalized
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.strip()
@@ -424,47 +342,47 @@ class SkillSearchRequest(BaseModel):
 
     @field_validator("tags")
     @classmethod
-    def normalize_tags(cls, value: list[str]) -> list[str]:
-        return [item.strip() for item in value if item.strip()]
-
-    @model_validator(mode="after")
-    def validate_has_selector(self) -> SkillSearchRequest:
-        if (
-            self.q is None
-            and not self.tags
-            and self.language is None
-            and self.fresh_within_days is None
-            and self.max_content_size_bytes is None
-            and not self.status
-            and not self.trust_tier
-        ):
-            raise ValueError("At least one search selector must be provided.")
-        return self
+    def normalize_discovery_tags(cls, value: list[str]) -> list[str]:
+        return _normalize_unique_tags(value)
 
 
-class SkillSearchResultResponse(BaseModel):
-    """Compact advisory candidate returned by the search API."""
+class SkillDiscoveryResponse(BaseModel):
+    """Ordered candidate slugs returned by discovery."""
+
+    candidates: list[str]
+
+
+class SkillDependencyResolutionResponse(BaseModel):
+    """Exact direct dependency declarations for one immutable version."""
 
     slug: str
     version: str
-    name: str
-    description: str | None
-    tags: list[str]
-    lifecycle_status: LifecycleStatus
-    trust_tier: TrustTier
-    published_at: datetime
-    freshness_days: int
-    content_size_bytes: int
-    usage_count: int
-    matched_fields: list[str]
-    matched_tags: list[str]
-    reasons: list[str]
+    depends_on: list[DependencySelectorResponse]
 
 
-class SkillSearchResponse(BaseModel):
-    """Compact advisory search response."""
+class SkillVersionBatchRequest(BaseModel):
+    """Ordered exact immutable coordinate batch request."""
 
-    results: list[SkillSearchResultResponse]
+    coordinates: list[SkillVersionCoordinateRequest] = Field(
+        min_length=1,
+        max_length=MAX_BATCH_ITEMS,
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class SkillVersionMetadataBatchItemResponse(BaseModel):
+    """One ordered immutable metadata batch result."""
+
+    status: BatchItemStatus
+    coordinate: SkillVersionCoordinateRequest
+    item: SkillVersionMetadataResponse | None = None
+
+
+class SkillVersionMetadataBatchResponse(BaseModel):
+    """Ordered immutable metadata batch response."""
+
+    results: list[SkillVersionMetadataBatchItemResponse]
 
 
 class SkillVersionStatusUpdateRequest(BaseModel):
@@ -485,39 +403,3 @@ class SkillVersionStatusResponse(BaseModel):
     trust_tier: TrustTier
     lifecycle_changed_at: datetime
     is_current_default: bool
-
-
-class SkillRelationshipBatchRequest(BaseModel):
-    """Ordered direct relationship query over immutable source versions."""
-
-    coordinates: list[SkillVersionCoordinateRequest] = Field(
-        min_length=1,
-        max_length=MAX_BATCH_ITEMS,
-    )
-    edge_types: list[RelationshipEdgeType] = Field(
-        default_factory=_default_relationship_edge_types,
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class SkillRelationshipEdgeResponse(BaseModel):
-    """One direct authored relationship edge from an immutable source version."""
-
-    edge_type: RelationshipEdgeType
-    selector: RelationshipSelectorResponse
-    target_version: SkillVersionReferenceResponse | None = None
-
-
-class SkillRelationshipBatchItemResponse(BaseModel):
-    """One ordered direct relationship lookup result."""
-
-    status: BatchItemStatus
-    coordinate: SkillVersionCoordinateRequest
-    relationships: list[SkillRelationshipEdgeResponse] | None = None
-
-
-class SkillRelationshipBatchResponse(BaseModel):
-    """Ordered batch response for direct immutable relationship reads."""
-
-    results: list[SkillRelationshipBatchItemResponse]

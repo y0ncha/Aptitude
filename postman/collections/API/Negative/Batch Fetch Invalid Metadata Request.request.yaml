@@ -1,0 +1,55 @@
+$kind: http-request
+order: 4000
+
+method: POST
+url: '{{baseUrl}}/fetch/metadata:batch'
+
+headers:
+  - key: Accept
+    value: application/json
+    description: Expect request validation to reject the invalid semantic version in the body
+  - key: Content-Type
+    value: application/json
+    description: Send an invalid metadata batch request body
+  - key: Authorization
+    value: 'Bearer {{readToken}}'
+    description: Authenticate with a caller that has the `read` scope
+
+body:
+  type: json
+  content: |-
+    {
+      "coordinates": [
+        {
+          "slug": "{{negative_missing_slug}}",
+          "version": "{{invalid_version}}"
+        }
+      ]
+    }
+
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const json = pm.response.json();
+
+      pm.test('Status is 422', () => {
+        pm.response.to.have.status(422);
+      });
+
+      pm.test('Invalid metadata batch returns the normalized validation envelope', () => {
+        pm.expect(json.error.code).to.eql('INVALID_REQUEST');
+        pm.expect(
+          json.error.details.errors.some(
+            (item) =>
+              Array.isArray(item.loc) &&
+              item.loc.includes('body') &&
+              item.loc.includes('coordinates') &&
+              item.loc.includes('version'),
+          ),
+        ).to.eql(true);
+      });
+
+      pm.execution.setNextRequest(
+        pm.response.code === 422 ? 'Batch Fetch Missing Skill Content' : null,
+      );

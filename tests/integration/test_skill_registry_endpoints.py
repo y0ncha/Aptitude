@@ -1,7 +1,10 @@
-"""Integration tests for authenticated registry, fetch, discovery, and governance routes."""
+"""Integration tests for the hard-cut registry API surface."""
 
 from __future__ import annotations
 
+from email.parser import BytesParser
+from email.policy import default as email_policy
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -31,6 +34,9 @@ def _request(
     version: str,
     *,
     raw_markdown: str = "# Python Lint\n\nLint Python files.\n",
+    name: str = "Python Lint",
+    description: str = "Linting skill",
+    tags: list[str] | None = None,
     trust_tier: str = "untrusted",
     provenance: dict[str, str] | None = None,
     depends_on: list[dict[str, object]] | None = None,
@@ -46,9 +52,9 @@ def _request(
             "rendered_summary": "Lint Python files.",
         },
         "metadata": {
-            "name": "Python Lint",
-            "description": "Linting skill",
-            "tags": ["python", "lint"],
+            "name": name,
+            "description": description,
+            "tags": tags or ["python", "lint"],
             "headers": {"runtime": "python"},
             "inputs_schema": {"type": "object"},
             "outputs_schema": {"type": "object"},
@@ -98,67 +104,135 @@ def _update_status(
     return response.json()
 
 
+def _parse_multipart_parts(response: Any) -> list[Any]:
+    content_type = response.headers["content-type"]
+    raw = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode() + response.content
+    message = BytesParser(policy=email_policy).parsebytes(raw)
+    assert message.is_multipart()
+    return list(message.iter_parts())
+
+
 @pytest.mark.integration
-def test_publish_fetch_identity_and_list_versions(
+def test_publish_discovery_resolution_and_batch_fetch(
     monkeypatch: pytest.MonkeyPatch,
     migrated_registry_database: str,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
-    slug = f"python.lint.{uuid4().hex}"
+    suffix = uuid4().hex
+    dependency_slug = f"python.dep.{suffix}"
+    source_slug = f"python.source.{suffix}"
 
     with TestClient(create_app()) as client:
-        _publish(client, _request(slug, "1.0.0", raw_markdown="# v1\n"))
         _publish(
             client,
             _request(
-                slug,
+                dependency_slug,
+                "1.0.0",
+                name="Python Dependency",
+                description="Base dependency",
+            ),
+        )
+        published = _publish(
+            client,
+            _request(
+                source_slug,
                 "2.0.0",
                 raw_markdown="# v2\n",
+                name="Python Hard Cut Source",
+                description="Hard cut discovery candidate",
+                tags=["python", "lint", "hard-cut"],
                 trust_tier="internal",
                 provenance={
                     "repo_url": "https://github.com/example/skills",
                     "commit_sha": "aabbccddeeff00112233445566778899aabbccdd",
-                    "tree_path": f"skills/{slug}",
+                    "tree_path": f"skills/{source_slug}",
                 },
+                depends_on=[{"slug": dependency_slug, "version": "1.0.0"}],
+                extends=[{"slug": "python.base", "version": "1.0.0"}],
             ),
         )
 
-        identity = client.get(f"/skills/{slug}", headers=_headers("reader-token"))
-        versions = client.get(f"/skills/{slug}/versions", headers=_headers("reader-token"))
-        metadata = client.get(
-            f"/skills/{slug}/versions/2.0.0",
+        discovery = client.post(
+            "/discovery",
+            json={
+                "name": "  Python Hard Cut Source  ",
+                "description": "  Hard cut discovery candidate  ",
+                "tags": ["python", "hard-cut", "python"],
+            },
             headers=_headers("reader-token"),
         )
-        content = client.get(
-            f"/skills/{slug}/versions/2.0.0/content",
+        resolution = client.get(
+            f"/resolution/{source_slug}/2.0.0",
+            headers=_headers("reader-token"),
+        )
+        metadata = client.post(
+            "/fetch/metadata:batch",
+            json={
+                "coordinates": [
+                    {"slug": source_slug, "version": "2.0.0"},
+                    {"slug": "python.missing", "version": "9.9.9"},
+                ]
+            },
+            headers=_headers("reader-token"),
+        )
+        content = client.post(
+            "/fetch/content:batch",
+            json={
+                "coordinates": [
+                    {"slug": source_slug, "version": "2.0.0"},
+                    {"slug": "python.missing", "version": "9.9.9"},
+                ]
+            },
             headers=_headers("reader-token"),
         )
 
-    assert identity.status_code == 200
-    assert identity.json()["slug"] == slug
-    assert identity.json()["status"] == "published"
-    assert identity.json()["current_version"]["version"] == "2.0.0"
-    assert identity.json()["current_version"]["lifecycle_status"] == "published"
-    assert identity.json()["current_version"]["trust_tier"] == "internal"
+    assert "relationships" not in published
+    assert "content_download_path" not in published
 
-    assert versions.status_code == 200
-    assert [item["version"] for item in versions.json()["versions"]] == ["2.0.0", "1.0.0"]
-    assert versions.json()["versions"][0]["trust_tier"] == "internal"
+    assert discovery.status_code == 200
+    assert discovery.json()["candidates"] == [source_slug]
+
+    assert resolution.status_code == 200
+    resolution_body = resolution.json()
+    assert resolution_body == {
+        "slug": source_slug,
+        "version": "2.0.0",
+        "depends_on": [
+            {
+                "slug": dependency_slug,
+                "version": "1.0.0",
+                "version_constraint": None,
+                "optional": None,
+                "markers": [],
+            }
+        ],
+    }
 
     assert metadata.status_code == 200
-    body = metadata.json()
-    assert body["slug"] == slug
-    assert body["version"] == "2.0.0"
-    assert body["lifecycle_status"] == "published"
-    assert body["trust_tier"] == "internal"
-    assert body["provenance"]["repo_url"] == "https://github.com/example/skills"
-    assert body["content"]["size_bytes"] == len(b"# v2\n")
-    assert body["content_download_path"] == f"/skills/{slug}/versions/2.0.0/content"
+    metadata_body = metadata.json()
+    assert [item["status"] for item in metadata_body["results"]] == ["found", "not_found"]
+    assert metadata_body["results"][0]["coordinate"] == {"slug": source_slug, "version": "2.0.0"}
+    assert metadata_body["results"][0]["item"]["slug"] == source_slug
+    assert metadata_body["results"][0]["item"]["version"] == "2.0.0"
+    assert "relationships" not in metadata_body["results"][0]["item"]
+    assert "content_download_path" not in metadata_body["results"][0]["item"]
+    assert metadata_body["results"][1]["item"] is None
 
     assert content.status_code == 200
-    assert content.text == "# v2\n"
-    assert content.headers["etag"] == body["content"]["checksum"]["digest"]
-    assert content.headers["cache-control"] == "public, immutable"
+    assert content.headers["content-type"].startswith("multipart/mixed; boundary=")
+    parts = _parse_multipart_parts(content)
+    assert len(parts) == 2
+    assert parts[0]["X-Aptitude-Slug"] == source_slug
+    assert parts[0]["X-Aptitude-Version"] == "2.0.0"
+    assert parts[0]["X-Aptitude-Status"] == "found"
+    assert parts[0]["ETag"] == published["content"]["checksum"]["digest"]
+    assert parts[0]["Cache-Control"] == "public, immutable"
+    assert parts[0]["Content-Length"] == str(len(b"# v2\n"))
+    assert parts[0].get_payload(decode=True).decode("utf-8") == "# v2\n"
+    assert parts[1]["X-Aptitude-Slug"] == "python.missing"
+    assert parts[1]["X-Aptitude-Version"] == "9.9.9"
+    assert parts[1]["X-Aptitude-Status"] == "not_found"
+    assert parts[1].get_payload(decode=True) == b""
 
 
 @pytest.mark.integration
@@ -182,6 +256,10 @@ def test_authentication_and_scope_failures_are_enforced(
             json=payload,
             headers=_headers("reader-token"),
         )
+        discovery_missing = client.post(
+            "/discovery",
+            json={"name": "Python Lint"},
+        )
 
     assert missing.status_code == 401
     assert missing.json()["error"]["code"] == "AUTHENTICATION_REQUIRED"
@@ -189,6 +267,8 @@ def test_authentication_and_scope_failures_are_enforced(
     assert invalid.json()["error"]["code"] == "INVALID_AUTH_TOKEN"
     assert insufficient.status_code == 403
     assert insufficient.json()["error"]["code"] == "INSUFFICIENT_SCOPE"
+    assert discovery_missing.status_code == 401
+    assert discovery_missing.json()["error"]["code"] == "AUTHENTICATION_REQUIRED"
 
 
 @pytest.mark.integration
@@ -255,11 +335,7 @@ def test_status_transitions_recompute_current_default(
         _publish(client, _request(slug, "2.0.0"))
 
         deprecated = _update_status(client, slug=slug, version="2.0.0", status="deprecated")
-        identity_after_deprecate = client.get(f"/skills/{slug}", headers=_headers("reader-token"))
-
         archived = _update_status(client, slug=slug, version="1.0.0", status="archived")
-        identity_after_archive = client.get(f"/skills/{slug}", headers=_headers("reader-token"))
-
         invalid_transition = client.patch(
             f"/skills/{slug}/versions/1.0.0/status",
             json={"status": "published"},
@@ -268,83 +344,14 @@ def test_status_transitions_recompute_current_default(
 
     assert deprecated["status"] == "deprecated"
     assert deprecated["is_current_default"] is False
-    assert identity_after_deprecate.status_code == 200
-    assert identity_after_deprecate.json()["current_version"]["version"] == "1.0.0"
-    assert identity_after_deprecate.json()["status"] == "published"
-
     assert archived["status"] == "archived"
     assert archived["is_current_default"] is False
-    assert identity_after_archive.status_code == 200
-    assert identity_after_archive.json()["current_version"]["version"] == "2.0.0"
-    assert identity_after_archive.json()["status"] == "deprecated"
-
     assert invalid_transition.status_code == 403
     assert invalid_transition.json()["error"]["code"] == "POLICY_STATUS_TRANSITION_FORBIDDEN"
 
 
 @pytest.mark.integration
-def test_relationship_batch_returns_all_edge_families_and_redacts_hidden_targets(
-    monkeypatch: pytest.MonkeyPatch,
-    migrated_registry_database: str,
-) -> None:
-    monkeypatch.setenv("DATABASE_URL", migrated_registry_database)
-    suffix = uuid4().hex
-    slug = f"python.source.{suffix}"
-    dependency_slug = f"python.dep.{suffix}"
-    extension_slug = f"python.ext.{suffix}"
-    overlap_slug = f"python.overlap.{suffix}"
-
-    with TestClient(create_app()) as client:
-        _publish(client, _request(dependency_slug, "1.0.0"))
-        _publish(client, _request(extension_slug, "2.0.0"))
-        _publish(client, _request(overlap_slug, "3.0.0"))
-        _publish(
-            client,
-            _request(
-                slug,
-                "1.0.0",
-                depends_on=[{"slug": dependency_slug, "version": "1.0.0"}],
-                extends=[{"slug": extension_slug, "version": "2.0.0"}],
-                conflicts_with=[{"slug": "python.conflict", "version": "9.9.9"}],
-                overlaps_with=[{"slug": overlap_slug, "version": "3.0.0"}],
-            ),
-        )
-
-        _update_status(client, slug=dependency_slug, version="1.0.0", status="archived")
-
-        response = client.post(
-            "/resolution/relationships:batch",
-            json={"coordinates": [{"slug": slug, "version": "1.0.0"}]},
-            headers=_headers("reader-token"),
-        )
-        admin_response = client.post(
-            "/resolution/relationships:batch",
-            json={"coordinates": [{"slug": slug, "version": "1.0.0"}]},
-            headers=_headers("admin-token"),
-        )
-
-    assert response.status_code == 200
-    relationships = response.json()["results"][0]["relationships"]
-    assert [item["edge_type"] for item in relationships] == [
-        "depends_on",
-        "extends",
-        "conflicts_with",
-        "overlaps_with",
-    ]
-    assert relationships[0]["selector"]["slug"] == dependency_slug
-    assert relationships[0]["target_version"] is None
-    assert relationships[1]["target_version"]["slug"] == extension_slug
-    assert relationships[2]["target_version"] is None
-    assert relationships[3]["target_version"]["slug"] == overlap_slug
-
-    assert admin_response.status_code == 200
-    assert admin_response.json()["results"][0]["relationships"][0]["target_version"]["slug"] == (
-        dependency_slug
-    )
-
-
-@pytest.mark.integration
-def test_discovery_filters_and_exact_reads_follow_governance_visibility(
+def test_governance_applies_to_discovery_resolution_and_batch_fetch(
     monkeypatch: pytest.MonkeyPatch,
     migrated_registry_database: str,
 ) -> None:
@@ -353,23 +360,48 @@ def test_discovery_filters_and_exact_reads_follow_governance_visibility(
     published_slug = f"python.discovery.published.{suffix}"
     deprecated_slug = f"python.discovery.deprecated.{suffix}"
     archived_slug = f"python.discovery.archived.{suffix}"
-    trusted_slug = f"python.discovery.internal.{suffix}"
+    internal_slug = f"python.discovery.internal.{suffix}"
 
     with TestClient(create_app()) as client:
-        _publish(client, _request(published_slug, "1.0.0", raw_markdown="# published\n"))
-        _publish(client, _request(deprecated_slug, "1.0.0", raw_markdown="# deprecated\n"))
-        _publish(client, _request(archived_slug, "1.0.0", raw_markdown="# archived\n"))
         _publish(
             client,
             _request(
-                trusted_slug,
+                published_slug,
                 "1.0.0",
-                raw_markdown="# trusted\n",
+                name="Python Discovery Published",
+                description="Published discovery candidate",
+            ),
+        )
+        _publish(
+            client,
+            _request(
+                deprecated_slug,
+                "1.0.0",
+                name="Python Discovery Deprecated",
+                description="Deprecated discovery candidate",
+            ),
+        )
+        _publish(
+            client,
+            _request(
+                archived_slug,
+                "1.0.0",
+                name="Python Discovery Archived",
+                description="Archived discovery candidate",
+            ),
+        )
+        _publish(
+            client,
+            _request(
+                internal_slug,
+                "1.0.0",
+                name="Python Discovery Internal",
+                description="Internal discovery candidate",
                 trust_tier="internal",
                 provenance={
                     "repo_url": "https://github.com/example/skills",
                     "commit_sha": "ddeeff00112233445566778899aabbccddeeff00",
-                    "tree_path": f"skills/{trusted_slug}",
+                    "tree_path": f"skills/{internal_slug}",
                 },
             ),
         )
@@ -377,62 +409,55 @@ def test_discovery_filters_and_exact_reads_follow_governance_visibility(
         _update_status(client, slug=deprecated_slug, version="1.0.0", status="deprecated")
         _update_status(client, slug=archived_slug, version="1.0.0", status="archived")
 
-        default_search = client.get(
-            "/discovery/skills/search",
-            params={"q": "python.discovery"},
+        published_discovery = client.post(
+            "/discovery",
+            json={"name": "Python Discovery"},
             headers=_headers("reader-token"),
         )
-        deprecated_search = client.get(
-            "/discovery/skills/search",
-            params={"q": "python.discovery", "status": "deprecated"},
+        archived_resolution_forbidden = client.get(
+            f"/resolution/{archived_slug}/1.0.0",
             headers=_headers("reader-token"),
         )
-        archived_forbidden = client.get(
-            "/discovery/skills/search",
-            params={"q": "python.discovery", "status": "archived"},
-            headers=_headers("reader-token"),
-        )
-        archived_admin = client.get(
-            "/discovery/skills/search",
-            params={"q": "python.discovery", "status": "archived"},
+        archived_resolution_admin = client.get(
+            f"/resolution/{archived_slug}/1.0.0",
             headers=_headers("admin-token"),
         )
-        internal_only = client.get(
-            "/discovery/skills/search",
-            params={"q": "python.discovery", "trust_tier": "internal"},
+        archived_metadata_forbidden = client.post(
+            "/fetch/metadata:batch",
+            json={"coordinates": [{"slug": archived_slug, "version": "1.0.0"}]},
             headers=_headers("reader-token"),
         )
-        archived_fetch = client.get(
-            f"/skills/{archived_slug}/versions/1.0.0",
-            headers=_headers("reader-token"),
-        )
-        archived_fetch_admin = client.get(
-            f"/skills/{archived_slug}/versions/1.0.0",
+        archived_metadata_admin = client.post(
+            "/fetch/metadata:batch",
+            json={"coordinates": [{"slug": archived_slug, "version": "1.0.0"}]},
             headers=_headers("admin-token"),
+        )
+        archived_content_forbidden = client.post(
+            "/fetch/content:batch",
+            json={"coordinates": [{"slug": archived_slug, "version": "1.0.0"}]},
+            headers=_headers("reader-token"),
         )
 
-    assert default_search.status_code == 200
-    assert {item["slug"] for item in default_search.json()["results"]} == {
+    assert published_discovery.status_code == 200
+    assert set(published_discovery.json()["candidates"]) == {
         published_slug,
-        trusted_slug,
+        internal_slug,
     }
+    assert deprecated_slug not in published_discovery.json()["candidates"]
+    assert archived_slug not in published_discovery.json()["candidates"]
 
-    assert deprecated_search.status_code == 200
-    assert {item["slug"] for item in deprecated_search.json()["results"]} == {deprecated_slug}
+    assert archived_resolution_forbidden.status_code == 403
+    assert archived_resolution_forbidden.json()["error"]["code"] == "POLICY_EXACT_READ_FORBIDDEN"
+    assert archived_resolution_admin.status_code == 200
+    assert archived_resolution_admin.json()["slug"] == archived_slug
 
-    assert archived_forbidden.status_code == 403
-    assert archived_forbidden.json()["error"]["code"] == "POLICY_DISCOVERY_FORBIDDEN"
+    assert archived_metadata_forbidden.status_code == 403
+    assert archived_metadata_forbidden.json()["error"]["code"] == "POLICY_EXACT_READ_FORBIDDEN"
+    assert archived_metadata_admin.status_code == 200
+    assert archived_metadata_admin.json()["results"][0]["status"] == "found"
 
-    assert archived_admin.status_code == 200
-    assert {item["slug"] for item in archived_admin.json()["results"]} == {archived_slug}
-
-    assert internal_only.status_code == 200
-    assert {item["slug"] for item in internal_only.json()["results"]} == {trusted_slug}
-
-    assert archived_fetch.status_code == 403
-    assert archived_fetch.json()["error"]["code"] == "POLICY_EXACT_READ_FORBIDDEN"
-    assert archived_fetch_admin.status_code == 200
-    assert archived_fetch_admin.json()["lifecycle_status"] == "archived"
+    assert archived_content_forbidden.status_code == 403
+    assert archived_content_forbidden.json()["error"]["code"] == "POLICY_EXACT_READ_FORBIDDEN"
 
 
 @pytest.mark.integration

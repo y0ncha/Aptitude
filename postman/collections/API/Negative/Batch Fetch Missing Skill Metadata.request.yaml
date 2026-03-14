@@ -1,0 +1,52 @@
+$kind: http-request
+order: 3000
+
+method: POST
+url: '{{baseUrl}}/fetch/metadata:batch'
+
+headers:
+  - key: Accept
+    value: application/json
+    description: Expect an ordered not_found result for an unknown coordinate
+  - key: Content-Type
+    value: application/json
+    description: Send a valid metadata batch request body
+  - key: Authorization
+    value: 'Bearer {{readToken}}'
+    description: Authenticate with a caller that has the `read` scope
+
+body:
+  type: json
+  content: |-
+    {
+      "coordinates": [
+        {
+          "slug": "{{negative_missing_slug}}",
+          "version": "{{negative_missing_version}}"
+        }
+      ]
+    }
+
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const json = pm.response.json();
+      const result = json.results[0];
+
+      pm.test('Status is 200', () => {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test('Unknown coordinate returns a not_found metadata batch item', () => {
+        pm.expect(result.status).to.eql('not_found');
+        pm.expect(result.coordinate.slug).to.eql(pm.collectionVariables.get('negative_missing_slug'));
+        pm.expect(result.coordinate.version).to.eql(
+          pm.collectionVariables.get('negative_missing_version'),
+        );
+        pm.expect(result.item).to.eql(null);
+      });
+
+      pm.execution.setNextRequest(
+        pm.response.code === 200 ? 'Batch Fetch Invalid Metadata Request' : null,
+      );

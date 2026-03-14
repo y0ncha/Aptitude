@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.interface.dto.skills import SkillRelationshipBatchRequest, SkillVersionCreateRequest
+from app.interface.dto.skills import (
+    SkillDiscoveryRequest,
+    SkillVersionBatchRequest,
+    SkillVersionCreateRequest,
+)
 
 
 def _request() -> dict[str, object]:
@@ -128,24 +132,26 @@ def test_publish_request_rejects_unknown_fields() -> None:
 
 
 @pytest.mark.unit
-def test_relationship_batch_request_uses_independent_default_edge_type_lists() -> None:
-    first = SkillRelationshipBatchRequest.model_validate(
-        {"coordinates": [{"slug": "python.lint", "version": "1.0.0"}]}
-    )
-    second = SkillRelationshipBatchRequest.model_validate(
-        {"coordinates": [{"slug": "python.format", "version": "2.0.0"}]}
+def test_discovery_request_trims_name_and_deduplicates_tags() -> None:
+    request = SkillDiscoveryRequest.model_validate(
+        {
+            "name": "  Python Lint  ",
+            "description": "  Lint Python files  ",
+            "tags": ["python", " lint ", "python"],
+        }
     )
 
-    assert first.edge_types == [
-        "depends_on",
-        "extends",
-        "conflicts_with",
-        "overlaps_with",
-    ]
-    assert second.edge_types == [
-        "depends_on",
-        "extends",
-        "conflicts_with",
-        "overlaps_with",
-    ]
-    assert first.edge_types is not second.edge_types
+    assert request.name == "Python Lint"
+    assert request.description == "Lint Python files"
+    assert request.tags == ["python", "lint"]
+
+
+@pytest.mark.unit
+def test_version_batch_request_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError):
+        SkillVersionBatchRequest.model_validate(
+            {
+                "coordinates": [{"slug": "python.lint", "version": "1.0.0"}],
+                "edge_types": ["depends_on"],
+            }
+        )

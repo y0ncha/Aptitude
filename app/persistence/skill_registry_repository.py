@@ -227,11 +227,11 @@ class SQLAlchemySkillRegistryRepository(
                 trust_tier=cast(TrustTier, entity.trust_tier),
             )
 
-    def get_version_summaries_batch(
+    def get_versions_batch(
         self,
         *,
         coordinates: tuple[ExactSkillCoordinate, ...],
-    ) -> tuple[StoredSkillVersionSummary, ...]:
+    ) -> tuple[StoredSkillVersion, ...]:
         if not coordinates:
             return ()
 
@@ -244,11 +244,45 @@ class SQLAlchemySkillRegistryRepository(
                     joinedload(SkillVersion.skill),
                     joinedload(SkillVersion.content),
                     joinedload(SkillVersion.metadata_row),
+                    selectinload(SkillVersion.relationship_selectors),
                 )
                 .where(tuple_(Skill.slug, SkillVersion.version).in_(coordinate_pairs))
             )
             rows = session.execute(statement).scalars().all()
-            return tuple(to_stored_skill_version_summary(item) for item in rows)
+            return tuple(to_stored_skill_version(item) for item in rows)
+
+    def get_version_contents_batch(
+        self,
+        *,
+        coordinates: tuple[ExactSkillCoordinate, ...],
+    ) -> tuple[StoredSkillVersionContent, ...]:
+        if not coordinates:
+            return ()
+
+        coordinate_pairs = [(item.slug, item.version) for item in coordinates]
+        with self._session_factory() as session:
+            statement = (
+                select(SkillVersion)
+                .join(Skill, Skill.id == SkillVersion.skill_fk)
+                .options(
+                    joinedload(SkillVersion.skill),
+                    joinedload(SkillVersion.content),
+                )
+                .where(tuple_(Skill.slug, SkillVersion.version).in_(coordinate_pairs))
+            )
+            rows = session.execute(statement).scalars().all()
+            return tuple(
+                StoredSkillVersionContent(
+                    slug=item.skill.slug,
+                    version=item.version,
+                    raw_markdown=item.content.raw_markdown,
+                    checksum_digest=item.content.checksum_digest,
+                    size_bytes=item.content.storage_size_bytes,
+                    lifecycle_status=cast(LifecycleStatus, item.lifecycle_status),
+                    trust_tier=cast(TrustTier, item.trust_tier),
+                )
+                for item in rows
+            )
 
     def list_versions(self, *, slug: str) -> tuple[StoredSkillVersionSummary, ...]:
         with self._session_factory() as session:

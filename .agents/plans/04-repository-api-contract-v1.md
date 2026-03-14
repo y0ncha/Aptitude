@@ -4,13 +4,13 @@
 Stabilize public repository API contracts and validation behavior to keep consumers insulated from internal refactors and aligned to the PyPI-like server/resolver boundary.
 
 ## Stack Alignment
-- API framework: FastAPI (OpenAPI-first contract generation)
+- API framework: FastAPI
 - Validation layer: Pydantic v2 request/response models
 - Runtime: Python 3.12+
 - Data layer compatibility: SQLAlchemy 2.0 + Alembic
 
 ## Scope
-- Define OpenAPI v1 for implemented repository endpoints.
+- Define the v1 public API contract for implemented repository endpoints.
 - Add DTO layer separate from core domain models.
 - Standardize error envelope and error codes.
 - Enforce request/response validation rules.
@@ -22,8 +22,8 @@ Stabilize public repository API contracts and validation behavior to keep consum
 - Enables resolver teams to treat server APIs as durable input contracts.
 
 ## Deliverables
-- OpenAPI spec covering all current v1 endpoints.
-- OpenAPI coverage for:
+- Public API documentation covering all current v1 endpoints.
+- Contract coverage for:
   - `POST /skills/publish`
   - `GET /skills/{id}/{version}`
   - `GET /skills/{id}`
@@ -35,7 +35,7 @@ Stabilize public repository API contracts and validation behavior to keep consum
 - Learning note on anti-corruption layer and compatibility design.
 
 ## Acceptance Criteria
-- API behavior matches OpenAPI examples.
+- API behavior matches documented examples.
 - Invalid payloads fail with consistent error format.
 - Existing endpoints keep backward-compatible response fields.
 - No contract drift against required repository endpoints.

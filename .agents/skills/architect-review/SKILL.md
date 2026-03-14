@@ -125,7 +125,7 @@ Elite software architect focused on ensuring architectural integrity, scalabilit
 - Architecture Decision Records (ADRs) and documentation
 - System context diagrams and container diagrams
 - Component and deployment view documentation
-- API documentation with OpenAPI/Swagger specifications
+- API documentation with Swagger and contract specifications
 - Architecture governance and review processes
 - Technical debt tracking and remediation planning
 

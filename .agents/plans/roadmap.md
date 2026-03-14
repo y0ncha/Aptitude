@@ -15,11 +15,11 @@ Deliver a production-ready, PyPI-like immutable registry service (`aptitude-serv
 
 ## Boundary Guardrails
 - This roadmap covers `aptitude-server` only.
-- Server owns data-local retrieval work: publish, exact fetch, list, discovery indexes, and metadata/description search candidate generation.
-- Resolver owns decision-local work: MCP/CLI prompt interfaces, prompt interpretation, reranking, final candidate selection, dependency solving, lock generation, plugin orchestration, and execution planning.
-- Server remains execution-agnostic and exposes governed APIs for publish, fetch, list, discovery, lifecycle, and provenance.
-- Server contracts are manifest/metadata/integrity envelopes; the server does not return canonical solved bundles.
-- Server search ranking remains advisory; resolver choice and lock output remain authoritative.
+- Server owns data-local registry work: publish, discovery candidate generation, exact first-degree dependency reads, immutable metadata batch fetch, immutable content batch fetch, lifecycle enforcement, provenance capture, and audit.
+- Resolver owns decision-local work: MCP/CLI prompt interfaces, prompt interpretation, reranking, final candidate selection, recursive dependency solving, lock generation, plugin orchestration, and execution planning.
+- Server remains execution-agnostic and exposes governed APIs for publish, discovery, resolution, batch fetch, lifecycle, and provenance.
+- Server contracts are slug candidates, authored direct dependency declarations, immutable metadata/content envelopes, and governance results; the server does not return canonical solved bundles.
+- Discovery remains candidate generation only; resolution remains exact first-degree dependency retrieval only; resolver choice and lock output remain authoritative.
 
 ## Milestones
 1. `01-foundation-service-skeleton.md`
@@ -28,26 +28,29 @@ Deliver a production-ready, PyPI-like immutable registry service (`aptitude-serv
 4. `04-repository-api-contract-v1.md`
 5. `05-metadata-search-ranking.md`
 6. `06-policy-conflict-governance.md`
-7. `07-canonical-postgres-storage-finalization.md`
-8. `08-public-api-simplification-and-contract-freeze.md`
-9. `09-governance-Provenance-and-audit-completion.md`
-10. `10-operability-and-release-readiness.md`
-11. `11-optional-evaluation-signals-and-snapshotting.md`
-12. `12-minimal-auth-boundary-and-token-governance.md`
-13. `13-environment-profiles-and-auth-modes.md`
+7. `07-mvp-read-api-hard-cut.md`
+8. `08-canonical-postgres-storage-finalization.md`
+9. `09-public-api-simplification-and-contract-freeze.md`
+10. `10-governance-provenance-and-audit-completion.md`
+11. `11-operability-and-release-readiness.md`
+12. `12-optional-evaluation-signals-and-snapshotting.md`
+13. `13-environment-profiles-and-runtime-separation.md`
+14. `14-minimal-auth-boundary-and-token-governance.md`
 
 ## PRD Phase Mapping
 - `MVP` (prd): milestones 01-04.
 - `v1.1` (prd): milestones 05-06.
-- `v2.0` prep (prd): milestones 07-09.
-- `Release readiness`: milestone 10.
-- `Post-launch optional discovery enhancements`: milestone 11.
-- `Security boundary hardening`: milestone 12.
+- `Read-contract simplification`: milestone 07.
+- `v2.0` prep (prd): milestones 08-10.
+- `Release readiness`: milestone 11.
+- `Post-launch optional discovery enhancements`: milestone 12.
 - `Environment profile separation`: milestone 13.
+- `Security boundary hardening`: milestone 14.
 - Resolver-specific initiatives (prompt interpretation, deterministic solving, reranking, plugin chains, and lock replay) are tracked in resolver planning and are out of scope for this roadmap.
 
 ## Roadmap Rules
-- Roadmap numbering is append-only.
+- Roadmap numbering is append-only after the one-time pre-implementation renumbering that inserted Plan 07.
+- The Plan 07 insertion and 07-13 to 08-14 shift are intentional cleanup to keep the MVP path simple before implementation work is finalized.
 - Plan filenames and titles may be corrected before implementation when the existing milestone framing is architecturally wrong.
 - Completed plans are never renamed or renumbered.
 - New scope changes create a new numbered plan file.

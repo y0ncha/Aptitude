@@ -17,7 +17,7 @@ from app.core.settings import Settings, get_settings
 from app.core.skill_discovery import SkillDiscoveryService
 from app.core.skill_fetch import SkillFetchService
 from app.core.skill_registry import SkillRegistryService
-from app.core.skill_relationships import SkillRelationshipService
+from app.core.skill_resolution import SkillResolutionService
 from app.interface.api.errors import ApiError
 
 # Shared settings dependency used by route handlers and adapters.
@@ -84,17 +84,15 @@ def get_skill_fetch_service(request: Request) -> SkillFetchService:
 SkillFetchServiceDep = Annotated[SkillFetchService, Depends(get_skill_fetch_service)]
 
 
-def get_skill_relationship_service(request: Request) -> SkillRelationshipService:
-    """Return the process-scoped relationship service from app state."""
-    service = getattr(request.app.state, "skill_relationship_service", None)
-    if not isinstance(service, SkillRelationshipService):
-        raise RuntimeError("Skill relationship service is not initialized.")
+def get_skill_resolution_service(request: Request) -> SkillResolutionService:
+    """Return the process-scoped resolution service from app state."""
+    service = getattr(request.app.state, "skill_resolution_service", None)
+    if not isinstance(service, SkillResolutionService):
+        raise RuntimeError("Skill resolution service is not initialized.")
     return service
 
 
-SkillRelationshipServiceDep = Annotated[
-    SkillRelationshipService, Depends(get_skill_relationship_service)
-]
+SkillResolutionServiceDep = Annotated[SkillResolutionService, Depends(get_skill_resolution_service)]
 
 
 def _caller_from_request(

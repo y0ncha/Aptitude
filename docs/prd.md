@@ -20,7 +20,7 @@
 
 - **Current Status**:
   - FastAPI service is implemented with PostgreSQL-backed publish, fetch, list, discovery, direct relationship, lifecycle, auth, and audit paths.
-  - The current HTTP surface uses concrete routes such as `POST /skill-versions` and `GET /discovery/skills/search`.
+  - The current HTTP surface uses concrete routes such as `POST /skill-versions`, `POST /discovery`, and `POST /fetch/metadata:batch`.
   - Digest-backed `ETag` emission on exact content fetch is implemented.
   - Full conditional-read behavior with `If-None-Match` returning `304 Not Modified` is not yet documented as implemented behavior.
 - **Planned State**:
@@ -63,9 +63,9 @@
 
 - **Current Status**:
   - Publish is implemented at `POST /skill-versions`.
-  - Discovery is implemented at `GET /discovery/skills/search`.
-  - Identity, version list, exact metadata fetch, exact content fetch, and lifecycle status update are implemented.
-  - Direct relationship reads are implemented at `POST /resolution/relationships:batch`.
+  - Discovery is implemented at `POST /discovery`.
+  - Immutable metadata and content fetch are implemented as batch-only routes.
+  - Direct dependency reads are implemented at `GET /resolution/{slug}/{version}`.
   - Bearer-token auth with `read`, `publish`, and `admin` scopes is enforced on business endpoints.
 - **Planned State**:
   - The public contract may eventually normalize endpoint naming around publish/search capability labels, but the product requirement is the capability, not a specific path spelling.
@@ -129,7 +129,7 @@ flowchart LR
 
 | Status | Technology | Used For |
 | --- | --- | --- |
-| Current (MVP baseline) | Python + FastAPI + OpenAPI | Registry API boundary for publish, fetch, list, discovery, relationship reads, and governance contracts. |
+| Current (MVP baseline) | Python + FastAPI + Swagger UI | Registry API boundary for publish, fetch, list, discovery, relationship reads, and governance contracts. |
 | Current (MVP baseline) | Pydantic v2 | Request and response validation for registry contracts. |
 | Current (MVP baseline) | Uvicorn via FastAPI CLI in development | ASGI serving in local development. |
 | Current (MVP baseline) | PostgreSQL | Canonical storage for versions, metadata, artifact payloads, lifecycle state, digest mappings, and audit records. |

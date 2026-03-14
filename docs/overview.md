@@ -196,7 +196,7 @@ Goal: each step ends with a complete, testable vertical slice.
 **Tests**
 
 - Contract tests for manifest/metadata payloads.
-- OpenAPI contract parity tests for the canonical API surface.
+- API contract parity tests for the canonical API surface.
 
 ### Step 3 - Client Resolver and Locking (MVP-2)
 
@@ -264,7 +264,7 @@ Goal: each step ends with a complete, testable vertical slice.
 
 ### Server
 
-- FastAPI + Pydantic v2 + OpenAPI.
+- FastAPI + Pydantic v2 + Swagger UI.
 - PostgreSQL + SQLAlchemy 2.0 + Alembic.
 - PostgreSQL split-table artifact storage with digest-keyed deduplication.
 

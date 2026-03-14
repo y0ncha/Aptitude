@@ -11,6 +11,9 @@ headers:
   - key: Content-Type
     value: application/json
     description: Send the normalized JSON publish contract
+  - key: Authorization
+    value: 'Bearer {{publishToken}}'
+    description: Authenticate with a caller that has the `publish` scope
 
 body:
   type: json

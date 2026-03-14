@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from app.core.ports import MetadataRecordInput
 from app.persistence.models.skill_relationship_selector import SkillRelationshipSelector
 from app.persistence.skill_registry_repository_support import (
     build_contains_pattern,
+    build_search_document_source,
     sort_relationship_selectors,
 )
 
@@ -35,3 +37,25 @@ def test_build_contains_pattern_normalizes_none_and_escapes_like_wildcards() -> 
     assert build_contains_pattern(None) is None
     assert build_contains_pattern("python.discovery") == "%python.discovery%"
     assert build_contains_pattern(r"python\_%") == r"%python\\\_\%%"
+
+
+def test_build_search_document_source_combines_searchable_fields() -> None:
+    source = build_search_document_source(
+        slug="Python.Discovery",
+        metadata=MetadataRecordInput(
+            name="  Python Hard Cut Source  ",
+            description=" Hard cut discovery candidate ",
+            tags=("Python", "hard-cut", "python"),
+            headers=None,
+            inputs_schema=None,
+            outputs_schema=None,
+            token_estimate=None,
+            maturity_score=None,
+            security_score=None,
+        ),
+    )
+
+    assert "python.discovery" in source
+    assert "python hard cut source" in source
+    assert "hard cut discovery candidate" in source
+    assert "hard-cut" in source

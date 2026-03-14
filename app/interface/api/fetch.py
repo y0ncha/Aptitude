@@ -1,141 +1,173 @@
-"""HTTP contract for exact immutable metadata and markdown content fetch endpoints."""
+"""HTTP contract for immutable metadata and markdown batch fetch endpoints."""
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
+from uuid import uuid4
 
-from fastapi import APIRouter, Path, Response, status
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi import APIRouter, Response, status
 
 from app.core.dependencies import ReadCallerDep, SkillFetchServiceDep
-from app.core.skill_registry import SkillVersionNotFoundError
-from app.interface.api.errors import error_response
-from app.interface.api.skill_api_support import to_version_response
+from app.core.ports import ExactSkillCoordinate
+from app.core.skill_fetch import SkillContentBatchItem
+from app.interface.api.skill_api_support import to_metadata_batch_item_response
 from app.interface.dto.errors import ErrorEnvelope
 from app.interface.dto.examples import (
     INVALID_REQUEST_ERROR_EXAMPLE,
-    SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE,
-    SKILL_VERSION_RESPONSE_EXAMPLE,
+    METADATA_BATCH_RESPONSE_EXAMPLE,
 )
-from app.interface.dto.skills import SkillVersionResponse
-from app.interface.validation import SEMVER_PATTERN, SLUG_PATTERN
+from app.interface.dto.skills import SkillVersionBatchRequest, SkillVersionMetadataBatchResponse
 
 router = APIRouter(tags=["fetch"])
 
-OpenAPIResponses = dict[int | str, dict[str, Any]]
+ApiResponses = dict[int | str, dict[str, Any]]
 
-REQUEST_VALIDATION_ERROR_RESPONSE: OpenAPIResponses = {
+REQUEST_VALIDATION_ERROR_RESPONSE: ApiResponses = {
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
         "model": ErrorEnvelope,
-        "description": "The request body or path parameters are invalid.",
+        "description": "The request body is invalid.",
         "content": {"application/json": {"example": INVALID_REQUEST_ERROR_EXAMPLE}},
     }
 }
 
-FETCH_RESPONSES: OpenAPIResponses = {
+METADATA_BATCH_RESPONSES: ApiResponses = {
     status.HTTP_200_OK: {
-        "description": "Exact immutable skill version metadata returned successfully.",
-        "content": {"application/json": {"example": SKILL_VERSION_RESPONSE_EXAMPLE}},
+        "description": "Ordered immutable metadata results returned successfully.",
+        "content": {"application/json": {"example": METADATA_BATCH_RESPONSE_EXAMPLE}},
     },
     **REQUEST_VALIDATION_ERROR_RESPONSE,
-    status.HTTP_404_NOT_FOUND: {
-        "model": ErrorEnvelope,
-        "description": "The requested immutable `slug@version` does not exist.",
-        "content": {"application/json": {"example": SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE}},
-    },
 }
 
-CONTENT_FETCH_RESPONSES: OpenAPIResponses = {
+CONTENT_BATCH_RESPONSES: ApiResponses = {
     status.HTTP_200_OK: {
-        "description": "Markdown content returned successfully.",
-        "content": {"text/markdown": {}},
+        "description": "Ordered immutable markdown parts returned successfully.",
+        "content": {
+            "multipart/mixed": {
+                "schema": {
+                    "type": "string",
+                    "format": "binary",
+                }
+            }
+        },
     },
     **REQUEST_VALIDATION_ERROR_RESPONSE,
-    status.HTTP_404_NOT_FOUND: {
-        "model": ErrorEnvelope,
-        "description": "The requested immutable `slug@version` does not exist.",
-        "content": {"application/json": {"example": SKILL_VERSION_NOT_FOUND_ERROR_EXAMPLE}},
-    },
 }
 
 
-@router.get(
-    "/skills/{slug}/versions/{version}",
-    operation_id="getExactSkillVersionMetadata",
-    summary="Fetch exact immutable version metadata",
+@router.post(
+    "/fetch/metadata:batch",
+    operation_id="batchGetImmutableMetadata",
+    summary="Fetch immutable metadata in batch",
     description=(
-        "Return the normalized metadata for one exact immutable skill version. "
-        "This route does not inline the raw markdown body."
+        "Return immutable metadata envelopes for an ordered list of exact coordinates. "
+        "Missing coordinates are returned as `not_found` items."
     ),
-    response_model=SkillVersionResponse,
+    response_model=SkillVersionMetadataBatchResponse,
     response_model_exclude_unset=True,
-    responses=FETCH_RESPONSES,
+    responses=METADATA_BATCH_RESPONSES,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "coordinates": [
+                            {"slug": "python.lint", "version": "1.2.3"},
+                            {"slug": "python.missing", "version": "9.9.9"},
+                        ]
+                    }
+                }
+            }
+        }
+    },
 )
-def get_skill_version_metadata(
-    slug: Annotated[
-        str,
-        Path(pattern=SLUG_PATTERN, description="Stable public slug of the skill to fetch."),
-    ],
-    version: Annotated[
-        str,
-        Path(pattern=SEMVER_PATTERN, description="Exact immutable semantic version to fetch."),
-    ],
+def fetch_metadata_batch(
+    request: SkillVersionBatchRequest,
     fetch_service: SkillFetchServiceDep,
     caller: ReadCallerDep,
-) -> SkillVersionResponse | JSONResponse:
-    """Fetch one immutable version metadata projection without markdown bytes."""
-    try:
-        stored = fetch_service.get_version_metadata(caller=caller, slug=slug, version=version)
-        return to_version_response(stored)
-    except SkillVersionNotFoundError as exc:
-        return error_response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            code="SKILL_VERSION_NOT_FOUND",
-            message=str(exc),
-            details={"slug": exc.slug, "version": exc.version},
-        )
+) -> SkillVersionMetadataBatchResponse:
+    """Return immutable metadata results in request order."""
+    results = fetch_service.get_version_metadata_batch(
+        caller=caller,
+        coordinates=_coordinates(request),
+    )
+    return SkillVersionMetadataBatchResponse(
+        results=[to_metadata_batch_item_response(item) for item in results]
+    )
 
 
-@router.get(
-    "/skills/{slug}/versions/{version}/content",
-    operation_id="getExactSkillVersionContent",
-    summary="Fetch exact immutable markdown content",
+@router.post(
+    "/fetch/content:batch",
+    operation_id="batchGetImmutableContent",
+    summary="Fetch immutable markdown content in batch",
     description=(
-        "Return the canonical markdown body for one exact immutable skill version with "
-        "immutable cache headers."
+        "Return immutable markdown content as `multipart/mixed` in request order. "
+        "Each part includes coordinate and status headers."
     ),
     response_model=None,
-    responses=CONTENT_FETCH_RESPONSES,
+    responses=CONTENT_BATCH_RESPONSES,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "coordinates": [
+                            {"slug": "python.lint", "version": "1.2.3"},
+                            {"slug": "python.missing", "version": "9.9.9"},
+                        ]
+                    }
+                }
+            }
+        }
+    },
 )
-def get_skill_version_content(
-    slug: Annotated[
-        str,
-        Path(pattern=SLUG_PATTERN, description="Stable public slug of the skill to fetch."),
-    ],
-    version: Annotated[
-        str,
-        Path(pattern=SEMVER_PATTERN, description="Exact immutable semantic version to fetch."),
-    ],
+def fetch_content_batch(
+    request: SkillVersionBatchRequest,
     fetch_service: SkillFetchServiceDep,
     caller: ReadCallerDep,
-) -> Response | JSONResponse:
-    """Return the raw markdown content for one immutable version."""
-    try:
-        stored = fetch_service.get_content(caller=caller, slug=slug, version=version)
-    except SkillVersionNotFoundError as exc:
-        return error_response(
-            status_code=status.HTTP_404_NOT_FOUND,
-            code="SKILL_VERSION_NOT_FOUND",
-            message=str(exc),
-            details={"slug": exc.slug, "version": exc.version},
-        )
-
-    return PlainTextResponse(
-        content=stored.raw_markdown,
-        media_type="text/markdown; charset=utf-8",
-        headers={
-            "ETag": stored.checksum.digest,
-            "Cache-Control": "public, immutable",
-            "Content-Length": str(stored.size_bytes),
-        },
+) -> Response:
+    """Return immutable markdown content as multipart in request order."""
+    items = fetch_service.get_content_batch(
+        caller=caller,
+        coordinates=_coordinates(request),
     )
+    boundary = f"aptitude-{uuid4().hex}"
+    return Response(
+        content=_multipart_body(items=items, boundary=boundary),
+        media_type=f"multipart/mixed; boundary={boundary}",
+    )
+
+
+def _coordinates(request: SkillVersionBatchRequest) -> tuple[ExactSkillCoordinate, ...]:
+    return tuple(
+        ExactSkillCoordinate(slug=item.slug, version=item.version) for item in request.coordinates
+    )
+
+
+def _multipart_body(*, items: tuple[SkillContentBatchItem, ...], boundary: str) -> bytes:
+    body = bytearray()
+    for item in items:
+        headers = [
+            "Content-Type: text/markdown; charset=utf-8",
+            f"X-Aptitude-Slug: {item.coordinate.slug}",
+            f"X-Aptitude-Version: {item.coordinate.version}",
+            f"X-Aptitude-Status: {'not_found' if item.item is None else 'found'}",
+        ]
+        content = b""
+        if item.item is not None:
+            headers.extend(
+                [
+                    f"ETag: {item.item.checksum.digest}",
+                    "Cache-Control: public, immutable",
+                    f"Content-Length: {item.item.size_bytes}",
+                ]
+            )
+            content = item.item.raw_markdown.encode("utf-8")
+
+        body.extend(f"--{boundary}\r\n".encode("ascii"))
+        body.extend("\r\n".join(headers).encode("utf-8"))
+        body.extend(b"\r\n\r\n")
+        body.extend(content)
+        body.extend(b"\r\n")
+
+    body.extend(f"--{boundary}--\r\n".encode("ascii"))
+    return bytes(body)

@@ -1,0 +1,2227 @@
+{
+  "info": {
+    "_postman_id": "42b033f2-7052-4646-b611-ce0d542f1f9a",
+    "name": "API",
+    "description": "Collection for validating the current Aptitude Skills API.\n\n  - Sanity: covers authenticated publish, lifecycle updates, batch fetch, discovery, and resolution\n  - Negative: covers authenticated validation, duplicate, not-found, and batch not_found responses\n\nNote: `/readyz` exposes a 503 branch only when the runtime is unhealthy, so the collection\nasserts the healthy `200 ready` path by default.\n\nAll business endpoints require `Authorization: Bearer <token>`. The default token variables\nmatch the local development `AUTH_TOKENS_JSON` example from the README.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "readToken",
+      "value": "reader-token",
+      "type": "string"
+    },
+    {
+      "key": "publishToken",
+      "value": "publisher-token",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "admin-token",
+      "type": "string"
+    },
+    {
+      "key": "runId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sanity_version_1",
+      "value": "1.0.0",
+      "type": "string"
+    },
+    {
+      "key": "sanity_version_2",
+      "value": "2.0.0",
+      "type": "string"
+    },
+    {
+      "key": "sanity_dependency_slug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sanity_extension_slug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sanity_overlap_slug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sanity_primary_slug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "negative_invalid_slug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "negative_duplicate_slug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "negative_missing_slug",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "negative_missing_version",
+      "value": "9.9.9",
+      "type": "string"
+    },
+    {
+      "key": "invalid_slug",
+      "value": "invalid slug",
+      "type": "string"
+    },
+    {
+      "key": "invalid_version",
+      "value": "not-a-semver",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Sanity",
+      "description": "Happy-path requests for the Aptitude Skills API.\n\nExpected run order:\n  1. Healthz\n  2. Readyz\n  3. Publish Dependency Skill\n  4. Publish Extension Skill\n  5. Publish Overlap Skill\n  6. Publish Skill v1\n  7. Publish Skill v2\n  8. Update Skill Version Status\n  9. Batch Fetch Published Skill Metadata\n  10. Batch Fetch Published Skill Content\n  11. Discover Published Skill Candidates\n  12. Resolve Published Skill Dependencies",
+      "item": [
+        {
+          "name": "Healthz",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Request a JSON liveness response"
+              }
+            ],
+            "url": "{{baseUrl}}/healthz"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Healthz payload matches contract', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.service).to.be.a('string').and.not.empty;",
+                  "  pm.expect(json.environment).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 200 ? 'Readyz' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Healthy (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Request a JSON liveness response"
+                  }
+                ],
+                "url": "{{baseUrl}}/healthz"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"service\": \"aptitude-server\",\n  \"environment\": \"development\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Readyz",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Request a JSON readiness response"
+              }
+            ],
+            "url": "{{baseUrl}}/readyz"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Readyz payload reports database readiness', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.status).to.eql('ready');",
+                  "  pm.expect(json.checks).to.be.an('array').and.not.empty;",
+                  "  pm.expect(",
+                  "    json.checks.some((check) => check.name === 'database' && check.status === 'ok'),",
+                  "  ).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 200 ? 'Publish Dependency Skill' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Ready (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Request a JSON readiness response"
+                  }
+                ],
+                "url": "{{baseUrl}}/readyz"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"status\": \"ready\",\n  \"checks\": [\n    {\n      \"name\": \"database\",\n      \"status\": \"ok\",\n      \"detail\": \"Database connection is available.\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Publish Dependency Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect the created immutable dependency version metadata"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the normalized JSON publish contract"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{sanity_dependency_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Dependency Skill\\n\\nRun `{{runId}}` dependency version 1.\\n\",\n    \"rendered_summary\": \"Postman dependency skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Dependency Skill\",\n    \"description\": \"Dependency seed for relationship coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"dependency\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 110,\n    \"maturity_score\": 0.8,\n    \"security_score\": 0.9\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 201', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Dependency skill publish returns the created version', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_dependency_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_1'));",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Extension Skill' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Created (201)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect the created immutable dependency version metadata"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the normalized JSON publish contract"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{sanity_dependency_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Dependency Skill\\n\\nRun `{{runId}}` dependency version 1.\\n\",\n    \"rendered_summary\": \"Postman dependency skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Dependency Skill\",\n    \"description\": \"Dependency seed for relationship coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"dependency\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 110,\n    \"maturity_score\": 0.8,\n    \"security_score\": 0.9\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.dep\",\n  \"version\": \"1.0.0\",\n  \"version_checksum\": {\n    \"algorithm\": \"sha256\",\n    \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n  },\n  \"content\": {\n    \"checksum\": {\n      \"algorithm\": \"sha256\",\n      \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n    },\n    \"size_bytes\": 123,\n    \"rendered_summary\": \"Lint Python files consistently.\"\n  },\n  \"metadata\": {\n    \"name\": \"Python Lint\",\n    \"description\": \"Linting skill\",\n    \"tags\": [\n      \"python\",\n      \"lint\"\n    ],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 128,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"lifecycle_status\": \"published\",\n  \"trust_tier\": \"untrusted\",\n  \"published_at\": \"2026-03-10T08:30:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Publish Extension Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect the created immutable extension version metadata"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the normalized JSON publish contract"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{sanity_extension_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Extension Skill\\n\\nRun `{{runId}}` extension version 1.\\n\",\n    \"rendered_summary\": \"Postman extension skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Extension Skill\",\n    \"description\": \"Extension seed for relationship coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"extension\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 120,\n    \"maturity_score\": 0.82,\n    \"security_score\": 0.91\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 201', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Extension skill publish returns the created version', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_extension_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_1'));",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Overlap Skill' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Created (201)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect the created immutable extension version metadata"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the normalized JSON publish contract"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{sanity_extension_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Extension Skill\\n\\nRun `{{runId}}` extension version 1.\\n\",\n    \"rendered_summary\": \"Postman extension skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Extension Skill\",\n    \"description\": \"Extension seed for relationship coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"extension\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 120,\n    \"maturity_score\": 0.82,\n    \"security_score\": 0.91\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.ext\",\n  \"version\": \"1.0.0\",\n  \"version_checksum\": {\n    \"algorithm\": \"sha256\",\n    \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n  },\n  \"content\": {\n    \"checksum\": {\n      \"algorithm\": \"sha256\",\n      \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n    },\n    \"size_bytes\": 123,\n    \"rendered_summary\": \"Lint Python files consistently.\"\n  },\n  \"metadata\": {\n    \"name\": \"Python Lint\",\n    \"description\": \"Linting skill\",\n    \"tags\": [\n      \"python\",\n      \"lint\"\n    ],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 128,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"lifecycle_status\": \"published\",\n  \"trust_tier\": \"untrusted\",\n  \"published_at\": \"2026-03-10T08:30:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Publish Overlap Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect the created immutable overlap version metadata"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the normalized JSON publish contract"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{sanity_overlap_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Overlap Skill\\n\\nRun `{{runId}}` overlap version 1.\\n\",\n    \"rendered_summary\": \"Postman overlap skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Overlap Skill\",\n    \"description\": \"Overlap seed for relationship coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"overlap\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 130,\n    \"maturity_score\": 0.83,\n    \"security_score\": 0.92\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 201', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Overlap skill publish returns the created version', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_overlap_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_1'));",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Skill v1' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Created (201)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect the created immutable overlap version metadata"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the normalized JSON publish contract"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{sanity_overlap_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Overlap Skill\\n\\nRun `{{runId}}` overlap version 1.\\n\",\n    \"rendered_summary\": \"Postman overlap skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Overlap Skill\",\n    \"description\": \"Overlap seed for relationship coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"overlap\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 130,\n    \"maturity_score\": 0.83,\n    \"security_score\": 0.92\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.overlap\",\n  \"version\": \"1.0.0\",\n  \"version_checksum\": {\n    \"algorithm\": \"sha256\",\n    \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n  },\n  \"content\": {\n    \"checksum\": {\n      \"algorithm\": \"sha256\",\n      \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n    },\n    \"size_bytes\": 123,\n    \"rendered_summary\": \"Lint Python files consistently.\"\n  },\n  \"metadata\": {\n    \"name\": \"Python Lint\",\n    \"description\": \"Linting skill\",\n    \"tags\": [\n      \"python\",\n      \"lint\"\n    ],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 128,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"lifecycle_status\": \"published\",\n  \"trust_tier\": \"untrusted\",\n  \"published_at\": \"2026-03-10T08:30:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Publish Skill v1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect the created immutable skill version metadata"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the normalized JSON publish contract"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{sanity_primary_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Primary Skill v1\\n\\nRun `{{runId}}` primary skill version 1.\\n\",\n    \"rendered_summary\": \"Postman primary skill version 1.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Primary Skill\",\n    \"description\": \"Primary sanity skill for collection coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"primary\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 200,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"relationships\": {\n    \"depends_on\": [\n      {\n        \"slug\": \"{{sanity_dependency_slug}}\",\n        \"version\": \"{{sanity_version_1}}\",\n        \"optional\": false,\n        \"markers\": [\"linux\"]\n      }\n    ],\n    \"extends\": [\n      {\n        \"slug\": \"{{sanity_extension_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ],\n    \"conflicts_with\": [\n      {\n        \"slug\": \"postman.conflict.{{runId}}\",\n        \"version\": \"9.9.9\"\n      }\n    ],\n    \"overlaps_with\": [\n      {\n        \"slug\": \"{{sanity_overlap_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 201', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Publish v1 response matches the requested identity', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_1'));",
+                  "  pm.expect(json.version_checksum.algorithm).to.eql('sha256');",
+                  "  pm.expect(json.content.checksum.algorithm).to.eql('sha256');",
+                  "  pm.expect(json.lifecycle_status).to.eql('published');",
+                  "  pm.expect(json.trust_tier).to.eql('untrusted');",
+                  "  pm.expect(json.published_at).to.be.a('string').and.not.empty;",
+                  "  pm.expect(json).to.not.have.property('content_download_path');",
+                  "  pm.expect(json).to.not.have.property('relationships');",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 201 ? 'Publish Skill v2' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Created (201)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect the created immutable skill version metadata"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the normalized JSON publish contract"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{sanity_primary_slug}}\",\n  \"version\": \"{{sanity_version_1}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Primary Skill v1\\n\\nRun `{{runId}}` primary skill version 1.\\n\",\n    \"rendered_summary\": \"Postman primary skill version 1.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Primary Skill\",\n    \"description\": \"Primary sanity skill for collection coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"primary\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 200,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"relationships\": {\n    \"depends_on\": [\n      {\n        \"slug\": \"{{sanity_dependency_slug}}\",\n        \"version\": \"{{sanity_version_1}}\",\n        \"optional\": false,\n        \"markers\": [\"linux\"]\n      }\n    ],\n    \"extends\": [\n      {\n        \"slug\": \"{{sanity_extension_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ],\n    \"conflicts_with\": [\n      {\n        \"slug\": \"postman.conflict.{{runId}}\",\n        \"version\": \"9.9.9\"\n      }\n    ],\n    \"overlaps_with\": [\n      {\n        \"slug\": \"{{sanity_overlap_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.primary\",\n  \"version\": \"1.0.0\",\n  \"version_checksum\": {\n    \"algorithm\": \"sha256\",\n    \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n  },\n  \"content\": {\n    \"checksum\": {\n      \"algorithm\": \"sha256\",\n      \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n    },\n    \"size_bytes\": 123,\n    \"rendered_summary\": \"Lint Python files consistently.\"\n  },\n  \"metadata\": {\n    \"name\": \"Python Lint\",\n    \"description\": \"Linting skill\",\n    \"tags\": [\n      \"python\",\n      \"lint\"\n    ],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 128,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"lifecycle_status\": \"published\",\n  \"trust_tier\": \"untrusted\",\n  \"published_at\": \"2026-03-10T08:30:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Publish Skill v2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect the created immutable skill version metadata"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the normalized JSON publish contract"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{sanity_primary_slug}}\",\n  \"version\": \"{{sanity_version_2}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Primary Skill v2\\n\\nRun `{{runId}}` primary skill version 2 with a larger body for discovery and content checks.\\n\",\n    \"rendered_summary\": \"Postman primary skill version 2.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Primary Skill\",\n    \"description\": \"Primary sanity skill for collection coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"primary\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 260,\n    \"maturity_score\": 0.92,\n    \"security_score\": 0.97\n  },\n  \"relationships\": {\n    \"depends_on\": [\n      {\n        \"slug\": \"{{sanity_dependency_slug}}\",\n        \"version\": \"{{sanity_version_1}}\",\n        \"optional\": false,\n        \"markers\": [\"linux\"]\n      }\n    ],\n    \"extends\": [\n      {\n        \"slug\": \"{{sanity_extension_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ],\n    \"conflicts_with\": [\n      {\n        \"slug\": \"postman.conflict.{{runId}}\",\n        \"version\": \"9.9.9\"\n      }\n    ],\n    \"overlaps_with\": [\n      {\n        \"slug\": \"{{sanity_overlap_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 201', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Publish v2 response matches the requested identity', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
+                  "  pm.expect(json.metadata.name).to.eql('Postman Primary Skill');",
+                  "  pm.expect(json.lifecycle_status).to.eql('published');",
+                  "  pm.expect(json.trust_tier).to.eql('untrusted');",
+                  "  pm.expect(json.published_at).to.be.a('string').and.not.empty;",
+                  "  pm.expect(json).to.not.have.property('relationships');",
+                  "  pm.expect(json).to.not.have.property('content_download_path');",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 201 ? 'Update Skill Version Status' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Created (201)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect the created immutable skill version metadata"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the normalized JSON publish contract"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{sanity_primary_slug}}\",\n  \"version\": \"{{sanity_version_2}}\",\n  \"content\": {\n    \"raw_markdown\": \"# Postman Primary Skill v2\\n\\nRun `{{runId}}` primary skill version 2 with a larger body for discovery and content checks.\\n\",\n    \"rendered_summary\": \"Postman primary skill version 2.\"\n  },\n  \"metadata\": {\n    \"name\": \"Postman Primary Skill\",\n    \"description\": \"Primary sanity skill for collection coverage\",\n    \"tags\": [\"postman\", \"sanity\", \"primary\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 260,\n    \"maturity_score\": 0.92,\n    \"security_score\": 0.97\n  },\n  \"relationships\": {\n    \"depends_on\": [\n      {\n        \"slug\": \"{{sanity_dependency_slug}}\",\n        \"version\": \"{{sanity_version_1}}\",\n        \"optional\": false,\n        \"markers\": [\"linux\"]\n      }\n    ],\n    \"extends\": [\n      {\n        \"slug\": \"{{sanity_extension_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ],\n    \"conflicts_with\": [\n      {\n        \"slug\": \"postman.conflict.{{runId}}\",\n        \"version\": \"9.9.9\"\n      }\n    ],\n    \"overlaps_with\": [\n      {\n        \"slug\": \"{{sanity_overlap_slug}}\",\n        \"version\": \"{{sanity_version_1}}\"\n      }\n    ]\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.primary\",\n  \"version\": \"2.0.0\",\n  \"version_checksum\": {\n    \"algorithm\": \"sha256\",\n    \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n  },\n  \"content\": {\n    \"checksum\": {\n      \"algorithm\": \"sha256\",\n      \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n    },\n    \"size_bytes\": 123,\n    \"rendered_summary\": \"Lint Python files consistently.\"\n  },\n  \"metadata\": {\n    \"name\": \"Python Lint\",\n    \"description\": \"Linting skill\",\n    \"tags\": [\n      \"python\",\n      \"lint\"\n    ],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 128,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"lifecycle_status\": \"published\",\n  \"trust_tier\": \"untrusted\",\n  \"published_at\": \"2026-03-10T08:30:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Skill Version Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect the updated immutable lifecycle status payload"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the immutable lifecycle transition request body"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}",
+                "description": "Authenticate with a caller that has the `admin` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"deprecated\",\n  \"note\": \"Postman sanity lifecycle transition for authenticated admin coverage.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Lifecycle update returns the current immutable status view', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
+                  "  pm.expect(json.status).to.eql('deprecated');",
+                  "  pm.expect(json.trust_tier).to.eql('untrusted');",
+                  "  pm.expect(json.is_current_default).to.eql(false);",
+                  "  pm.expect(json.lifecycle_changed_at).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 200 ? 'Batch Fetch Published Skill Metadata' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Updated (200)",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect the updated immutable lifecycle status payload"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the immutable lifecycle transition request body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}",
+                    "description": "Authenticate with a caller that has the `admin` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}/status",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"deprecated\",\n  \"note\": \"Postman sanity lifecycle transition for authenticated admin coverage.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.primary\",\n  \"version\": \"2.0.0\",\n  \"status\": \"deprecated\",\n  \"trust_tier\": \"untrusted\",\n  \"lifecycle_changed_at\": \"2026-03-11T09:15:00Z\",\n  \"is_current_default\": false\n}"
+            },
+            {
+              "name": "Not Found (404)",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect the updated immutable lifecycle status payload"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the immutable lifecycle transition request body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}",
+                    "description": "Authenticate with a caller that has the `admin` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skills/{{sanity_primary_slug}}/versions/{{sanity_version_2}}/status",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"deprecated\",\n  \"note\": \"Postman sanity lifecycle transition for authenticated admin coverage.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"SKILL_VERSION_NOT_FOUND\",\n    \"message\": \"Skill version not found: python.lint@9.9.9\",\n    \"details\": {\n      \"slug\": \"python.lint\",\n      \"version\": \"9.9.9\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Batch Fetch Published Skill Metadata",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Request immutable metadata in batch request order"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the exact coordinate batch body"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/fetch/metadata:batch",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const [found, missing] = json.results;",
+                  "",
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Metadata batch returns ordered found and not_found results', () => {",
+                  "  pm.expect(json.results).to.have.length(2);",
+                  "  pm.expect(found.status).to.eql('found');",
+                  "  pm.expect(found.coordinate.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "  pm.expect(found.coordinate.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
+                  "  pm.expect(found.item.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "  pm.expect(found.item.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
+                  "  pm.expect(found.item.metadata.name).to.eql('Postman Primary Skill');",
+                  "  pm.expect(found.item.lifecycle_status).to.eql('deprecated');",
+                  "  pm.expect(found.item.trust_tier).to.eql('untrusted');",
+                  "  pm.expect(found.item).to.not.have.property('relationships');",
+                  "  pm.expect(found.item).to.not.have.property('content_download_path');",
+                  "",
+                  "  pm.expect(missing.status).to.eql('not_found');",
+                  "  pm.expect(missing.coordinate.slug).to.eql(pm.collectionVariables.get('negative_missing_slug'));",
+                  "  pm.expect(missing.coordinate.version).to.eql(",
+                  "    pm.collectionVariables.get('negative_missing_version'),",
+                  "  );",
+                  "  pm.expect(missing.item).to.eql(null);",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 200 ? 'Batch Fetch Published Skill Content' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Found And Missing (200)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Request immutable metadata in batch request order"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the exact coordinate batch body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/fetch/metadata:batch",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"results\": [\n    {\n      \"status\": \"found\",\n      \"coordinate\": {\n        \"slug\": \"python.primary\",\n        \"version\": \"2.0.0\"\n      },\n      \"item\": {\n        \"slug\": \"python.primary\",\n        \"version\": \"2.0.0\",\n        \"version_checksum\": {\n          \"algorithm\": \"sha256\",\n          \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n        },\n        \"content\": {\n          \"checksum\": {\n            \"algorithm\": \"sha256\",\n            \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n          },\n          \"size_bytes\": 123,\n          \"rendered_summary\": \"Lint Python files consistently.\"\n        },\n        \"metadata\": {\n          \"name\": \"Python Lint\",\n          \"description\": \"Linting skill\",\n          \"tags\": [\n            \"python\",\n            \"lint\"\n          ],\n          \"headers\": {\n            \"runtime\": \"python\"\n          },\n          \"inputs_schema\": {\n            \"type\": \"object\"\n          },\n          \"outputs_schema\": {\n            \"type\": \"object\"\n          },\n          \"token_estimate\": 128,\n          \"maturity_score\": 0.9,\n          \"security_score\": 0.95\n        },\n        \"lifecycle_status\": \"deprecated\",\n        \"trust_tier\": \"untrusted\",\n        \"published_at\": \"2026-03-10T08:30:00Z\"\n      }\n    },\n    {\n      \"status\": \"not_found\",\n      \"coordinate\": {\n        \"slug\": \"python.missing\",\n        \"version\": \"9.9.9\"\n      },\n      \"item\": null\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Batch Fetch Published Skill Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "multipart/mixed",
+                "description": "Request immutable markdown content as multipart"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the exact coordinate batch body"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/fetch/content:batch",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.text();",
+                  "",
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Content batch returns multipart content with found and not_found parts', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('multipart/mixed');",
+                  "  pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('sanity_primary_slug')}`);",
+                  "  pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('sanity_version_2')}`);",
+                  "  pm.expect(body).to.include('X-Aptitude-Status: found');",
+                  "  pm.expect(body).to.include('Cache-Control: public, immutable');",
+                  "  pm.expect(body).to.include('ETag:');",
+                  "  pm.expect(body).to.include('Postman Primary Skill v2');",
+                  "  pm.expect(body).to.include(pm.collectionVariables.get('runId'));",
+                  "  pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('negative_missing_slug')}`);",
+                  "  pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('negative_missing_version')}`);",
+                  "  pm.expect(body).to.include('X-Aptitude-Status: not_found');",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 200 ? 'Discover Published Skill Candidates' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Multipart Found And Missing (200)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "multipart/mixed",
+                    "description": "Request immutable markdown content as multipart"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the exact coordinate batch body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/fetch/content:batch",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{sanity_primary_slug}}\",\n      \"version\": \"{{sanity_version_2}}\"\n    },\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "multipart/mixed; boundary=aptitude-example"
+                }
+              ],
+              "body": "--aptitude-example\r\nContent-Type: text/markdown; charset=utf-8\r\nX-Aptitude-Slug: python.primary\r\nX-Aptitude-Version: 2.0.0\r\nX-Aptitude-Status: found\r\nETag: c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\r\nCache-Control: public, immutable\r\nContent-Length: 39\r\n\r\n# Python Lint\n\nLint Python files consistently.\n\r\n--aptitude-example\r\nContent-Type: text/markdown; charset=utf-8\r\nX-Aptitude-Slug: python.missing\r\nX-Aptitude-Version: 9.9.9\r\nX-Aptitude-Status: not_found\r\n\r\n--aptitude-example--\r\n"
+            }
+          ]
+        },
+        {
+          "name": "Discover Published Skill Candidates",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Discover candidate slugs from name, description, and tags"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the body-based discovery request"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/discovery",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Primary Skill\",\n  \"description\": \"Primary sanity skill for collection coverage\",\n  \"tags\": [\"postman\", \"sanity\", \"primary\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Discovery returns the published primary slug candidate', () => {",
+                  "  pm.expect(json.candidates).to.be.an('array').and.not.empty;",
+                  "  pm.expect(json.candidates[0]).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 200 ? 'Resolve Published Skill Dependencies' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Candidates (200)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Discover candidate slugs from name, description, and tags"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the body-based discovery request"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/discovery",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman Primary Skill\",\n  \"description\": \"Primary sanity skill for collection coverage\",\n  \"tags\": [\"postman\", \"sanity\", \"primary\"]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"candidates\": [\n    \"python.lint\",\n    \"python.format\"\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resolve Published Skill Dependencies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Request the direct authored dependencies for the published version"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/resolution/{{sanity_primary_slug}}/{{sanity_version_2}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const first = json.depends_on[0];",
+                  "",
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Resolution returns only direct depends_on declarations', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));",
+                  "  pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_2'));",
+                  "  pm.expect(json.depends_on).to.be.an('array').and.have.length(1);",
+                  "  pm.expect(first.slug).to.eql(pm.collectionVariables.get('sanity_dependency_slug'));",
+                  "  pm.expect(first.version).to.eql(pm.collectionVariables.get('sanity_version_1'));",
+                  "  pm.expect(json).to.not.have.property('extends');",
+                  "  pm.expect(json).to.not.have.property('relationships');",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 200 ? 'Publish Invalid Request' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Direct Dependencies (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Request the direct authored dependencies for the published version"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/resolution/{{sanity_primary_slug}}/{{sanity_version_2}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.lint\",\n  \"version\": \"1.2.3\",\n  \"depends_on\": [\n    {\n      \"slug\": \"python.base\",\n      \"version_constraint\": \">=1.0.0,<2.0.0\",\n      \"optional\": true,\n      \"markers\": [\n        \"linux\",\n        \"gpu\"\n      ]\n    }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Negative",
+      "description": "Deterministic negative coverage for the Aptitude Skills API.\n\nThese requests include their own setup for the duplicate-publish path so the\nfolder can still be run independently.",
+      "item": [
+        {
+          "name": "Publish Invalid Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect a normalized invalid-request response"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send an invalid normalized JSON publish contract"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{negative_invalid_slug}}\",\n  \"version\": \"1.0.0\",\n  \"content\": {\n    \"raw_markdown\": \"# Invalid Postman Skill\\n\\nThis publish request should fail validation.\\n\",\n    \"rendered_summary\": \"Invalid request payload.\"\n  },\n  \"metadata\": {\n    \"name\": \"Invalid Postman Skill\",\n    \"description\": \"Invalid publish payload for negative coverage\",\n    \"tags\": [\"postman\", \"negative\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 50,\n    \"maturity_score\": 0.5,\n    \"security_score\": 0.5\n  },\n  \"relationships\": {\n    \"depends_on\": [\n      {\n        \"slug\": \"{{sanity_dependency_slug}}\",\n        \"version_constraint\": \"latest\"\n      }\n    ],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 422', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('Invalid publish returns the normalized API error envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('INVALID_REQUEST');",
+                  "  pm.expect(json.error.details.errors).to.be.an('array').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 422 ? 'Seed Duplicate Skill Version' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Invalid Request (422)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect a normalized invalid-request response"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send an invalid normalized JSON publish contract"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{negative_invalid_slug}}\",\n  \"version\": \"1.0.0\",\n  \"content\": {\n    \"raw_markdown\": \"# Invalid Postman Skill\\n\\nThis publish request should fail validation.\\n\",\n    \"rendered_summary\": \"Invalid request payload.\"\n  },\n  \"metadata\": {\n    \"name\": \"Invalid Postman Skill\",\n    \"description\": \"Invalid publish payload for negative coverage\",\n    \"tags\": [\"postman\", \"negative\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 50,\n    \"maturity_score\": 0.5,\n    \"security_score\": 0.5\n  },\n  \"relationships\": {\n    \"depends_on\": [\n      {\n        \"slug\": \"{{sanity_dependency_slug}}\",\n        \"version_constraint\": \"latest\"\n      }\n    ],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"INVALID_REQUEST\",\n    \"message\": \"Request validation failed.\",\n    \"details\": {\n      \"errors\": [\n        {\n          \"type\": \"string_pattern_mismatch\",\n          \"loc\": [\n            \"path\",\n            \"version\"\n          ],\n          \"msg\": \"String should match pattern\",\n          \"input\": \"latest\"\n        }\n      ]\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Seed Duplicate Skill Version",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Seed a version for the duplicate-publish check"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the normalized JSON publish contract"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{negative_duplicate_slug}}\",\n  \"version\": \"1.0.0\",\n  \"content\": {\n    \"raw_markdown\": \"# Duplicate Seed Skill\\n\\nInitial version used to provoke a duplicate publish.\\n\",\n    \"rendered_summary\": \"Duplicate seed skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Duplicate Seed Skill\",\n    \"description\": \"Seed version for duplicate publish coverage\",\n    \"tags\": [\"postman\", \"negative\", \"duplicate\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 75,\n    \"maturity_score\": 0.7,\n    \"security_score\": 0.8\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 201', () => {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Duplicate seed version is created successfully', () => {",
+                  "  pm.expect(json.slug).to.eql(pm.collectionVariables.get('negative_duplicate_slug'));",
+                  "  pm.expect(json.version).to.eql('1.0.0');",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 201 ? 'Publish Duplicate Skill Version' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Created (201)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Seed a version for the duplicate-publish check"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the normalized JSON publish contract"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{negative_duplicate_slug}}\",\n  \"version\": \"1.0.0\",\n  \"content\": {\n    \"raw_markdown\": \"# Duplicate Seed Skill\\n\\nInitial version used to provoke a duplicate publish.\\n\",\n    \"rendered_summary\": \"Duplicate seed skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Duplicate Seed Skill\",\n    \"description\": \"Seed version for duplicate publish coverage\",\n    \"tags\": [\"postman\", \"negative\", \"duplicate\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 75,\n    \"maturity_score\": 0.7,\n    \"security_score\": 0.8\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"slug\": \"python.duplicate\",\n  \"version\": \"1.0.0\",\n  \"version_checksum\": {\n    \"algorithm\": \"sha256\",\n    \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n  },\n  \"content\": {\n    \"checksum\": {\n      \"algorithm\": \"sha256\",\n      \"digest\": \"c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2\"\n    },\n    \"size_bytes\": 123,\n    \"rendered_summary\": \"Lint Python files consistently.\"\n  },\n  \"metadata\": {\n    \"name\": \"Python Lint\",\n    \"description\": \"Linting skill\",\n    \"tags\": [\n      \"python\",\n      \"lint\"\n    ],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 128,\n    \"maturity_score\": 0.9,\n    \"security_score\": 0.95\n  },\n  \"lifecycle_status\": \"published\",\n  \"trust_tier\": \"untrusted\",\n  \"published_at\": \"2026-03-10T08:30:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Publish Duplicate Skill Version",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect a normalized duplicate-version response"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send the same normalized JSON publish contract again"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{publishToken}}",
+                "description": "Authenticate with a caller that has the `publish` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/skill-versions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"{{negative_duplicate_slug}}\",\n  \"version\": \"1.0.0\",\n  \"content\": {\n    \"raw_markdown\": \"# Duplicate Seed Skill\\n\\nInitial version used to provoke a duplicate publish.\\n\",\n    \"rendered_summary\": \"Duplicate seed skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Duplicate Seed Skill\",\n    \"description\": \"Seed version for duplicate publish coverage\",\n    \"tags\": [\"postman\", \"negative\", \"duplicate\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 75,\n    \"maturity_score\": 0.7,\n    \"security_score\": 0.8\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 409', () => {",
+                  "  pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('Duplicate publish returns the normalized API error envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('DUPLICATE_SKILL_VERSION');",
+                  "  pm.expect(json.error.details.slug).to.eql(",
+                  "    pm.collectionVariables.get('negative_duplicate_slug'),",
+                  "  );",
+                  "  pm.expect(json.error.details.version).to.eql('1.0.0');",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 409 ? 'Batch Fetch Missing Skill Metadata' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Duplicate (409)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect a normalized duplicate-version response"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send the same normalized JSON publish contract again"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{publishToken}}",
+                    "description": "Authenticate with a caller that has the `publish` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/skill-versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"slug\": \"{{negative_duplicate_slug}}\",\n  \"version\": \"1.0.0\",\n  \"content\": {\n    \"raw_markdown\": \"# Duplicate Seed Skill\\n\\nInitial version used to provoke a duplicate publish.\\n\",\n    \"rendered_summary\": \"Duplicate seed skill.\"\n  },\n  \"metadata\": {\n    \"name\": \"Duplicate Seed Skill\",\n    \"description\": \"Seed version for duplicate publish coverage\",\n    \"tags\": [\"postman\", \"negative\", \"duplicate\"],\n    \"headers\": {\n      \"runtime\": \"python\"\n    },\n    \"inputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"outputs_schema\": {\n      \"type\": \"object\"\n    },\n    \"token_estimate\": 75,\n    \"maturity_score\": 0.7,\n    \"security_score\": 0.8\n  },\n  \"relationships\": {\n    \"depends_on\": [],\n    \"extends\": [],\n    \"conflicts_with\": [],\n    \"overlaps_with\": []\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"DUPLICATE_SKILL_VERSION\",\n    \"message\": \"Skill version already exists: python.lint@1.2.3\",\n    \"details\": {\n      \"slug\": \"python.lint\",\n      \"version\": \"1.2.3\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Batch Fetch Missing Skill Metadata",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect an ordered not_found result for an unknown coordinate"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send a valid metadata batch request body"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/fetch/metadata:batch",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const result = json.results[0];",
+                  "",
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Unknown coordinate returns a not_found metadata batch item', () => {",
+                  "  pm.expect(result.status).to.eql('not_found');",
+                  "  pm.expect(result.coordinate.slug).to.eql(pm.collectionVariables.get('negative_missing_slug'));",
+                  "  pm.expect(result.coordinate.version).to.eql(",
+                  "    pm.collectionVariables.get('negative_missing_version'),",
+                  "  );",
+                  "  pm.expect(result.item).to.eql(null);",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 200 ? 'Batch Fetch Invalid Metadata Request' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Not Found Result (200)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect an ordered not_found result for an unknown coordinate"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send a valid metadata batch request body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/fetch/metadata:batch",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"results\": [\n    {\n      \"status\": \"not_found\",\n      \"coordinate\": {\n        \"slug\": \"python.missing\",\n        \"version\": \"9.9.9\"\n      },\n      \"item\": null\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Batch Fetch Invalid Metadata Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect request validation to reject the invalid semantic version in the body"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send an invalid metadata batch request body"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/fetch/metadata:batch",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{invalid_version}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 422', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('Invalid metadata batch returns the normalized validation envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('INVALID_REQUEST');",
+                  "  pm.expect(",
+                  "    json.error.details.errors.some(",
+                  "      (item) =>",
+                  "        Array.isArray(item.loc) &&",
+                  "        item.loc.includes('body') &&",
+                  "        item.loc.includes('coordinates') &&",
+                  "        item.loc.includes('version'),",
+                  "    ),",
+                  "  ).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(",
+                  "  pm.response.code === 422 ? 'Batch Fetch Missing Skill Content' : null,",
+                  ");"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Invalid Request (422)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect request validation to reject the invalid semantic version in the body"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send an invalid metadata batch request body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/fetch/metadata:batch",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{invalid_version}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"INVALID_REQUEST\",\n    \"message\": \"Request validation failed.\",\n    \"details\": {\n      \"errors\": [\n        {\n          \"type\": \"string_pattern_mismatch\",\n          \"loc\": [\n            \"path\",\n            \"version\"\n          ],\n          \"msg\": \"String should match pattern\",\n          \"input\": \"latest\"\n        }\n      ]\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Batch Fetch Missing Skill Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "multipart/mixed",
+                "description": "Expect multipart content with a not_found part for the missing coordinate"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send a valid content batch request body"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/fetch/content:batch",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.text();",
+                  "",
+                  "pm.test('Status is 200', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Missing content batch returns a multipart not_found part', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('multipart/mixed');",
+                  "  pm.expect(body).to.include(`X-Aptitude-Slug: ${pm.collectionVariables.get('negative_missing_slug')}`);",
+                  "  pm.expect(body).to.include(`X-Aptitude-Version: ${pm.collectionVariables.get('negative_missing_version')}`);",
+                  "  pm.expect(body).to.include('X-Aptitude-Status: not_found');",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 200 ? 'Discover Without Name' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Multipart Not Found (200)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "multipart/mixed",
+                    "description": "Expect multipart content with a not_found part for the missing coordinate"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send a valid content batch request body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/fetch/content:batch",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coordinates\": [\n    {\n      \"slug\": \"{{negative_missing_slug}}\",\n      \"version\": \"{{negative_missing_version}}\"\n    }\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "multipart/mixed; boundary=aptitude-example"
+                }
+              ],
+              "body": "--aptitude-example\r\nContent-Type: text/markdown; charset=utf-8\r\nX-Aptitude-Slug: python.missing\r\nX-Aptitude-Version: 9.9.9\r\nX-Aptitude-Status: not_found\r\n\r\n--aptitude-example--\r\n"
+            }
+          ]
+        },
+        {
+          "name": "Discover Without Name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect discovery validation to reject a missing required name"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "Send an invalid discovery request body"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/discovery",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 422', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('Missing discovery name returns the normalized API error envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('INVALID_REQUEST');",
+                  "  pm.expect(",
+                  "    json.error.details.errors.some(",
+                  "      (item) =>",
+                  "        Array.isArray(item.loc) &&",
+                  "        item.loc.includes('body') &&",
+                  "        item.loc.includes('name'),",
+                  "    ),",
+                  "  ).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 422 ? 'Resolve Invalid Version' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Invalid Request (422)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect discovery validation to reject a missing required name"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "description": "Send an invalid discovery request body"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/discovery",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"INVALID_REQUEST\",\n    \"message\": \"Request validation failed.\",\n    \"details\": {\n      \"errors\": [\n        {\n          \"type\": \"string_pattern_mismatch\",\n          \"loc\": [\n            \"path\",\n            \"version\"\n          ],\n          \"msg\": \"String should match pattern\",\n          \"input\": \"latest\"\n        }\n      ]\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resolve Invalid Version",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect request validation to reject the invalid semantic version"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/resolution/{{negative_missing_slug}}/{{invalid_version}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 422', () => {",
+                  "  pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('Invalid resolution version returns the normalized validation envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('INVALID_REQUEST');",
+                  "  pm.expect(",
+                  "    json.error.details.errors.some(",
+                  "      (item) =>",
+                  "        Array.isArray(item.loc) &&",
+                  "        item.loc.includes('path') &&",
+                  "        item.loc.includes('version'),",
+                  "    ),",
+                  "  ).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(pm.response.code === 422 ? 'Resolve Missing Skill Version' : null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Invalid Request (422)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect request validation to reject the invalid semantic version"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/resolution/{{negative_missing_slug}}/{{invalid_version}}"
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"INVALID_REQUEST\",\n    \"message\": \"Request validation failed.\",\n    \"details\": {\n      \"errors\": [\n        {\n          \"type\": \"string_pattern_mismatch\",\n          \"loc\": [\n            \"path\",\n            \"version\"\n          ],\n          \"msg\": \"String should match pattern\",\n          \"input\": \"latest\"\n        }\n      ]\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Resolve Missing Skill Version",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "description": "Expect a normalized not-found error response for an unknown resolution coordinate"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{readToken}}",
+                "description": "Authenticate with a caller that has the `read` scope"
+              }
+            ],
+            "url": "{{baseUrl}}/resolution/{{negative_missing_slug}}/{{negative_missing_version}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "",
+                  "pm.test('Status is 404', () => {",
+                  "  pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Missing resolution coordinate returns the normalized API error envelope', () => {",
+                  "  pm.expect(json.error.code).to.eql('SKILL_VERSION_NOT_FOUND');",
+                  "  pm.expect(json.error.details.slug).to.eql(",
+                  "    pm.collectionVariables.get('negative_missing_slug'),",
+                  "  );",
+                  "  pm.expect(json.error.details.version).to.eql(",
+                  "    pm.collectionVariables.get('negative_missing_version'),",
+                  "  );",
+                  "});",
+                  "",
+                  "pm.execution.setNextRequest(null);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Not Found (404)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json",
+                    "description": "Expect a normalized not-found error response for an unknown resolution coordinate"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{readToken}}",
+                    "description": "Authenticate with a caller that has the `read` scope"
+                  }
+                ],
+                "url": "{{baseUrl}}/resolution/{{negative_missing_slug}}/{{negative_missing_version}}"
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"SKILL_VERSION_NOT_FOUND\",\n    \"message\": \"Skill version not found: python.lint@9.9.9\",\n    \"details\": {\n      \"slug\": \"python.lint\",\n      \"version\": \"9.9.9\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const requestName = pm.info.requestName || '';",
+          "const resetFlowStarts = new Set(['Healthz', 'Publish Invalid Request']);",
+          "",
+          "const ensureRunState = (forceReset = false) => {",
+          "  let runId = pm.collectionVariables.get('runId');",
+          "",
+          "  if (forceReset || !runId) {",
+          "    runId = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;",
+          "    pm.collectionVariables.set('runId', runId);",
+          "    pm.collectionVariables.set('sanity_dependency_slug', `postman.dep.${runId}`);",
+          "    pm.collectionVariables.set('sanity_extension_slug', `postman.ext.${runId}`);",
+          "    pm.collectionVariables.set('sanity_overlap_slug', `postman.overlap.${runId}`);",
+          "    pm.collectionVariables.set('sanity_primary_slug', `postman.primary.${runId}`);",
+          "    pm.collectionVariables.set('negative_invalid_slug', `postman.invalid.${runId}`);",
+          "    pm.collectionVariables.set('negative_duplicate_slug', `postman.duplicate.${runId}`);",
+          "    pm.collectionVariables.set('negative_missing_slug', `postman.missing.${runId}`);",
+          "  }",
+          "};",
+          "",
+          "ensureRunState(resetFlowStarts.has(requestName));"
+        ]
+      }
+    }
+  ]
+}

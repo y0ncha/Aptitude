@@ -258,15 +258,22 @@ class SkillVersionReadPort(Protocol):
     def get_version(self, *, slug: str, version: str) -> StoredSkillVersion | None:
         """Return a specific immutable version, if present."""
 
-    def get_version_content(self, *, slug: str, version: str) -> StoredSkillVersionContent | None:
-        """Return raw markdown content for one immutable version, if present."""
-
-    def get_version_summaries_batch(
+    def get_versions_batch(
         self,
         *,
         coordinates: tuple[ExactSkillCoordinate, ...],
-    ) -> tuple[StoredSkillVersionSummary, ...]:
-        """Return summaries for exact immutable version coordinates."""
+    ) -> tuple[StoredSkillVersion, ...]:
+        """Return stored immutable versions for the requested coordinates."""
+
+    def get_version_content(self, *, slug: str, version: str) -> StoredSkillVersionContent | None:
+        """Return raw markdown content for one immutable version, if present."""
+
+    def get_version_contents_batch(
+        self,
+        *,
+        coordinates: tuple[ExactSkillCoordinate, ...],
+    ) -> tuple[StoredSkillVersionContent, ...]:
+        """Return raw markdown content rows for exact immutable version coordinates."""
 
 
 class SkillSearchPort(Protocol):

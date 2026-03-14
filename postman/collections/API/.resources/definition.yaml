@@ -8,14 +8,20 @@ name: API
 description: |-
   Collection for validating the current Aptitude Skills API.
 
-    - Sanity: covers every public endpoint on the healthy path
-    - Negative: covers deterministic validation, duplicate, not-found, and not-found-style responses
+    - Sanity: covers authenticated publish, lifecycle updates, batch fetch, discovery, and resolution
+    - Negative: covers authenticated validation, duplicate, not-found, and batch not_found responses
 
   Note: `/readyz` exposes a 503 branch only when the runtime is unhealthy, so the collection
   asserts the healthy `200 ready` path by default.
 
+  All business endpoints require `Authorization: Bearer <token>`. The default token variables
+  match the local development `AUTH_TOKENS_JSON` example from the README.
+
 variables:
   baseUrl: http://localhost:8000
+  readToken: reader-token
+  publishToken: publisher-token
+  adminToken: admin-token
   runId: ""
   sanity_version_1: 1.0.0
   sanity_version_2: 2.0.0

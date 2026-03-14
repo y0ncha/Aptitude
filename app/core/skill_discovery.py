@@ -1,9 +1,48 @@
-"""Core discovery service for indexed advisory candidate retrieval."""
+"""Core discovery service for ordered candidate slug retrieval."""
 
 from __future__ import annotations
 
-from app.core.skill_search import SkillSearchService
+from dataclasses import dataclass
+
+from app.core.governance import CallerIdentity
+from app.core.skill_search import SkillSearchQuery, SkillSearchService
+
+
+@dataclass(frozen=True, slots=True)
+class SkillDiscoveryRequest:
+    """Body-based discovery request for candidate slug lookup."""
+
+    name: str
+    description: str | None
+    tags: tuple[str, ...]
 
 
 class SkillDiscoveryService(SkillSearchService):
-    """Named discovery service facade over the existing advisory search implementation."""
+    """Discovery facade that narrows search output to ordered candidate slugs."""
+
+    def discover_candidates(
+        self,
+        *,
+        caller: CallerIdentity,
+        request: SkillDiscoveryRequest,
+    ) -> tuple[str, ...]:
+        """Return ordered candidate slugs for the provided discovery request."""
+        results = self.search(
+            caller=caller,
+            query=SkillSearchQuery(
+                q=_query_text(request),
+                tags=request.tags,
+                language=None,
+                fresh_within_days=None,
+                max_footprint_bytes=None,
+                limit=20,
+            ),
+        )
+        return tuple(item.slug for item in results)
+
+
+def _query_text(request: SkillDiscoveryRequest) -> str:
+    parts = [request.name]
+    if request.description:
+        parts.append(request.description)
+    return " ".join(parts)

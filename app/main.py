@@ -20,7 +20,7 @@ from app.core.settings import get_settings, reset_settings_cache
 from app.core.skill_discovery import SkillDiscoveryService
 from app.core.skill_fetch import SkillFetchService
 from app.core.skill_registry import SkillRegistryService
-from app.core.skill_relationships import SkillRelationshipService
+from app.core.skill_resolution import SkillResolutionService
 from app.interface.api.discovery import router as discovery_router
 from app.interface.api.errors import (
     ApiError,
@@ -57,9 +57,9 @@ logger = logging.getLogger(__name__)
 
 API_VERSION = "1.0.0"
 API_DESCRIPTION = """
-Registry-first API for immutable skill publication, indexed search candidate
-retrieval, direct relationship reads, exact version retrieval, artifact streaming,
-and version listing.
+Registry-first API for immutable skill publication, candidate discovery,
+exact dependency reads, immutable metadata batch fetch, immutable content batch
+fetch, and governed lifecycle updates.
 
 The server owns data-local registry operations only. Prompt interpretation,
 reranking, dependency solving, final selection, lock generation, and execution
@@ -73,6 +73,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     reset_settings_cache()
     settings = get_settings()
     configure_logging(settings.log_level)
+    if settings.auth_tokens:
+        logger.info("loaded %d auth token(s) from settings", len(settings.auth_tokens))
+    else:
+        logger.warning(
+            "no auth tokens configured; authenticated endpoints will reject all bearer tokens"
+        )
     init_engine(settings.database_url)
     session_factory = get_session_factory()
     registry_repository = SQLAlchemySkillRegistryRepository(session_factory=session_factory)
@@ -92,9 +98,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         version_reader=registry_repository,
         governance_policy=governance_policy,
     )
-    app.state.skill_relationship_service = SkillRelationshipService(
+    app.state.skill_resolution_service = SkillResolutionService(
         relationship_reader=registry_repository,
-        version_reader=registry_repository,
         governance_policy=governance_policy,
     )
     logger.info("service startup complete")

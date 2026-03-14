@@ -11,6 +11,9 @@ headers:
   - key: Content-Type
     value: application/json
     description: Send the same normalized JSON publish contract again
+  - key: Authorization
+    value: 'Bearer {{publishToken}}'
+    description: Authenticate with a caller that has the `publish` scope
 
 body:
   type: json
@@ -65,4 +68,6 @@ scripts:
         pm.expect(json.error.details.version).to.eql('1.0.0');
       });
 
-      pm.execution.setNextRequest(pm.response.code === 409 ? 'Get Missing Skill Identity' : null);
+      pm.execution.setNextRequest(
+        pm.response.code === 409 ? 'Batch Fetch Missing Skill Metadata' : null,
+      );

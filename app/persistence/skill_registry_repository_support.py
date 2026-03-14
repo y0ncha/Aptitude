@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
-from sqlalchemy import BigInteger, DateTime, Integer, Text, bindparam, text
+from sqlalchemy import BigInteger, DateTime, Integer, Text, bindparam, func, literal_column, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import IntegrityError
 
@@ -255,10 +255,26 @@ def build_search_document(
         normalized_tags=sorted({normalize_text(tag) for tag in metadata.tags if tag.strip()}),
         lifecycle_status="published",
         trust_tier=governance.trust_tier,
+        search_vector=cast(
+            Any,
+            func.to_tsvector(
+                literal_column("'simple'::regconfig"),
+                build_search_document_source(slug=slug, metadata=metadata),
+            ),
+        ),
         published_at=ensure_datetime(published_at),
         content_size_bytes=content_size_bytes,
         usage_count=0,
     )
+
+
+def build_search_document_source(*, slug: str, metadata: MetadataRecordInput) -> str:
+    """Combine immutable searchable fields into one deterministic text source."""
+    parts = [normalize_text(slug), normalize_text(metadata.name)]
+    if metadata.description is not None:
+        parts.append(normalize_text(metadata.description))
+    parts.extend(normalize_text(tag) for tag in metadata.tags)
+    return " ".join(part for part in parts if part)
 
 
 def is_duplicate_skill_version_error(error: IntegrityError) -> bool:

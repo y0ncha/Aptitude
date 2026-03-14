@@ -1,21 +1,38 @@
-"""Core exact fetch service for normalized version metadata and markdown reads."""
+"""Core batch fetch service for immutable metadata and markdown reads."""
 
 from __future__ import annotations
 
-from app.core.governance import CallerIdentity, GovernancePolicy
-from app.core.ports import SkillVersionReadPort
+from dataclasses import dataclass
+
+from app.core.governance import CallerIdentity, GovernancePolicy, LifecycleStatus
+from app.core.ports import ExactSkillCoordinate, SkillVersionReadPort
 from app.core.skill_models import (
     SHA256_ALGORITHM,
     SkillChecksum,
     SkillContentDocument,
     SkillVersionDetail,
-    SkillVersionNotFoundError,
 )
 from app.core.skill_version_projections import to_skill_version_detail
 
 
+@dataclass(frozen=True, slots=True)
+class SkillVersionMetadataBatchItem:
+    """One ordered immutable metadata batch result."""
+
+    coordinate: ExactSkillCoordinate
+    item: SkillVersionDetail | None
+
+
+@dataclass(frozen=True, slots=True)
+class SkillContentBatchItem:
+    """One ordered immutable content batch result."""
+
+    coordinate: ExactSkillCoordinate
+    item: SkillContentDocument | None
+
+
 class SkillFetchService:
-    """Read-only service for exact immutable metadata and markdown content access."""
+    """Read-only service for batch immutable metadata and markdown access."""
 
     def __init__(
         self,
@@ -26,44 +43,73 @@ class SkillFetchService:
         self._version_reader = version_reader
         self._governance_policy = governance_policy
 
-    def get_version_metadata(
+    def get_version_metadata_batch(
         self,
         *,
         caller: CallerIdentity,
-        slug: str,
-        version: str,
-    ) -> SkillVersionDetail:
-        """Return one immutable version metadata projection without raw markdown."""
-        stored = self._version_reader.get_version(slug=slug, version=version)
-        if stored is None:
-            raise SkillVersionNotFoundError(slug=slug, version=version)
-        self._governance_policy.ensure_exact_read_allowed(
+        coordinates: tuple[ExactSkillCoordinate, ...],
+    ) -> tuple[SkillVersionMetadataBatchItem, ...]:
+        """Return immutable version metadata in request order."""
+        stored_versions = self._version_reader.get_versions_batch(coordinates=coordinates)
+        stored_by_key = {(item.slug, item.version): item for item in stored_versions}
+        self._ensure_batch_visibility(
             caller=caller,
-            lifecycle_status=stored.lifecycle_status,
+            lifecycle_statuses=tuple(item.lifecycle_status for item in stored_versions),
         )
-        return to_skill_version_detail(stored=stored)
 
-    def get_content(
+        return tuple(
+            SkillVersionMetadataBatchItem(
+                coordinate=coordinate,
+                item=(
+                    None
+                    if (stored := stored_by_key.get((coordinate.slug, coordinate.version))) is None
+                    else to_skill_version_detail(stored=stored)
+                ),
+            )
+            for coordinate in coordinates
+        )
+
+    def get_content_batch(
         self,
         *,
         caller: CallerIdentity,
-        slug: str,
-        version: str,
-    ) -> SkillContentDocument:
-        """Return raw markdown content for one immutable version."""
-        stored = self._version_reader.get_version_content(slug=slug, version=version)
-        if stored is None:
-            raise SkillVersionNotFoundError(slug=slug, version=version)
-        self._governance_policy.ensure_exact_read_allowed(
+        coordinates: tuple[ExactSkillCoordinate, ...],
+    ) -> tuple[SkillContentBatchItem, ...]:
+        """Return immutable markdown content in request order."""
+        stored_contents = self._version_reader.get_version_contents_batch(coordinates=coordinates)
+        stored_by_key = {(item.slug, item.version): item for item in stored_contents}
+        self._ensure_batch_visibility(
             caller=caller,
-            lifecycle_status=stored.lifecycle_status,
+            lifecycle_statuses=tuple(item.lifecycle_status for item in stored_contents),
         )
 
-        return SkillContentDocument(
-            raw_markdown=stored.raw_markdown,
-            checksum=SkillChecksum(
-                algorithm=SHA256_ALGORITHM,
-                digest=stored.checksum_digest,
-            ),
-            size_bytes=stored.size_bytes,
+        return tuple(
+            SkillContentBatchItem(
+                coordinate=coordinate,
+                item=(
+                    None
+                    if (stored := stored_by_key.get((coordinate.slug, coordinate.version))) is None
+                    else SkillContentDocument(
+                        raw_markdown=stored.raw_markdown,
+                        checksum=SkillChecksum(
+                            algorithm=SHA256_ALGORITHM,
+                            digest=stored.checksum_digest,
+                        ),
+                        size_bytes=stored.size_bytes,
+                    )
+                ),
+            )
+            for coordinate in coordinates
         )
+
+    def _ensure_batch_visibility(
+        self,
+        *,
+        caller: CallerIdentity,
+        lifecycle_statuses: tuple[LifecycleStatus, ...],
+    ) -> None:
+        for lifecycle_status in lifecycle_statuses:
+            self._governance_policy.ensure_exact_read_allowed(
+                caller=caller,
+                lifecycle_status=lifecycle_status,
+            )

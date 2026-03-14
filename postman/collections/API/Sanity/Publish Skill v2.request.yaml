@@ -11,6 +11,9 @@ headers:
   - key: Content-Type
     value: application/json
     description: Send the normalized JSON publish contract
+  - key: Authorization
+    value: 'Bearer {{publishToken}}'
+    description: Authenticate with a caller that has the `publish` scope
 
 body:
   type: json
@@ -83,7 +86,13 @@ scripts:
         pm.expect(json.slug).to.eql(pm.collectionVariables.get('sanity_primary_slug'));
         pm.expect(json.version).to.eql(pm.collectionVariables.get('sanity_version_2'));
         pm.expect(json.metadata.name).to.eql('Postman Primary Skill');
-        pm.expect(json.relationships.depends_on).to.have.length(1);
+        pm.expect(json.lifecycle_status).to.eql('published');
+        pm.expect(json.trust_tier).to.eql('untrusted');
+        pm.expect(json.published_at).to.be.a('string').and.not.empty;
+        pm.expect(json).to.not.have.property('relationships');
+        pm.expect(json).to.not.have.property('content_download_path');
       });
 
-      pm.execution.setNextRequest(pm.response.code === 201 ? 'Get Published Skill Identity' : null);
+      pm.execution.setNextRequest(
+        pm.response.code === 201 ? 'Update Skill Version Status' : null,
+      );
