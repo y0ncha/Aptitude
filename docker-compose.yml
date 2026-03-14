@@ -1,3 +1,5 @@
+name: aptitude-db
+
 services:
   db:
     image: ${POSTGRES_IMAGE:-postgres:15.17}

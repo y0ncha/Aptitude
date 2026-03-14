@@ -15,7 +15,7 @@
 __pycache__/
 *.py[cod]
 docs/
-.deployment/
+deployment/
 postman/
 scripts/
 tests/

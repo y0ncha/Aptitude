@@ -1,3 +1,5 @@
+name: aptitude-server
+
 services:
   db:
     image: ${POSTGRES_IMAGE:-postgres:15.17}
@@ -5,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aptitude}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .deployment/resources/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deployment/resources/.env}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
@@ -29,8 +31,8 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .deployment/resources/.env}@db:5432/${POSTGRES_DB:-aptitude}
-      AUTH_TOKENS_JSON: ${AUTH_TOKENS_JSON:?Set AUTH_TOKENS_JSON in .deployment/resources/.env}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deployment/resources/.env}@db:5432/${POSTGRES_DB:-aptitude}
+      AUTH_TOKENS_JSON: ${AUTH_TOKENS_JSON:?Set AUTH_TOKENS_JSON in deployment/resources/.env}
       ACTIVE_POLICY_PROFILE: ${ACTIVE_POLICY_PROFILE:-default}
       APP_ENV: ${APP_ENV:-container}
       APP_NAME: ${APP_NAME:-aptitude-server}
