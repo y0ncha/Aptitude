@@ -203,8 +203,8 @@ This table is derived from `skills`, `skill_versions`, `skill_metadata`, and
 | Column | Type | Purpose |
 | --- | --- | --- |
 | `skill_version_fk` | `bigint` | PK and FK to `skill_versions.id` |
-| `slug` | `text` | Normalized identifier for direct matching |
-| `normalized_slug` | `text` | Lowercased identifier for exact matching |
+| `slug` | `text` | Canonical/original identifier for direct matching; normalized form stored in `normalized_slug` |
+| `normalized_slug` | `text` | Lowercased/normalized identifier for exact matching |
 | `version` | `text` | Candidate version |
 | `name` | `text` | Display name |
 | `normalized_name` | `text` | Lowercased display name |
