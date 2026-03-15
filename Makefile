@@ -2,6 +2,7 @@ UV ?= UV_CACHE_DIR=.uv-cache uv
 DOCKER_IMAGE ?= y0ncha/aptitude-server
 DOCKER_TAG ?= latest
 DOCKER_IMAGE_REF := $(DOCKER_IMAGE):$(DOCKER_TAG)
+DOCKER_PLATFORMS ?= linux/amd64,linux/arm64
 
 .PHONY: run debug test lint format typecheck migrate-up migrate-down db-up db-down docker-build docker-push docker-build-push
 
@@ -45,9 +46,9 @@ db-down:
 	docker compose down -v
 
 docker-build:
-	docker build -t $(DOCKER_IMAGE_REF) .
+	docker buildx build --load -t $(DOCKER_IMAGE_REF) .
 
 docker-push:
-	docker push $(DOCKER_IMAGE_REF)
+	docker buildx build --platform $(DOCKER_PLATFORMS) --push -t $(DOCKER_IMAGE_REF) .
 
-docker-build-push: docker-build docker-push
+docker-build-push: docker-push
