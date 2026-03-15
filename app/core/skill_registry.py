@@ -133,6 +133,13 @@ class SkillRegistryService:
         except DuplicateSkillVersionError:
             raise
         except SkillRegistryPersistenceError as exc:
+            # Handle potential race between _enforce_publish_intent() and persistence layer.
+            # Under concurrent intent="create_skill" publishes for the same slug, the DB
+            # unique constraint on skills.slug may be violated even though the initial
+            # skill_exists() check passed. In that case, surface SkillAlreadyExistsError
+            # to keep the public contract consistent.
+            if command.intent == "create_skill" and self._is_slug_unique_violation(exc):
+                raise SkillAlreadyExistsError(slug=command.slug) from exc
             raise SkillRegistryError("Failed to persist immutable skill version.") from exc
 
         self._audit_recorder.record_event(
@@ -156,6 +163,36 @@ class SkillRegistryService:
             return
         if not skill_exists:
             raise SkillNotFoundError(slug=slug)
+
+    def _is_slug_unique_violation(
+        self,
+        exc: SkillRegistryPersistenceError,
+    ) -> bool:
+        """Best-effort detection of a unique-constraint violation on skills.slug.
+
+        The exact structure of SkillRegistryPersistenceError is implementation-specific,
+        so we conservatively inspect the exception message (and any nested cause) for
+        indicators of both a uniqueness violation and the slug field.
+        """
+        # Start with the direct exception message.
+        messages: list[str] = [str(exc)]
+
+        # If the port attaches an underlying cause, include its message as well.
+        cause = getattr(exc, "cause", None)
+        if cause is None:
+            cause = getattr(exc, "__cause__", None)
+        if cause is not None:
+            messages.append(str(cause))
+
+        combined = " ".join(messages).lower()
+
+        # Heuristics: look for typical uniqueness indicators and the slug field name.
+        has_unique_indicator = any(
+            token in combined for token in ("unique", "duplicate", "constraint")
+        )
+        mentions_slug = "slug" in combined
+
+        return has_unique_indicator and mentions_slug
 
     def update_version_status(
         self,
