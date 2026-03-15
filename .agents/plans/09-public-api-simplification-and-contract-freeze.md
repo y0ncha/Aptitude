@@ -54,3 +54,8 @@ Freeze the final public registry contract around the hard-cut route split introd
 - Contract review confirming resolution remains public and exact-first-degree only.
 - Regression review confirming removed batch-fetch routes are not reintroduced as convenience APIs.
 - Documentation review confirming compatibility language has been removed from the final contract description.
+
+## Implementation Notes (2026-03-15)
+- Primary contract docs now state the frozen public baseline explicitly in `docs/api-contract.md`, `.agents/plans/roadmap.md`, `docs/scope.md`, and `docs/prd.md`.
+- Historical milestone docs that described pre-freeze route shapes now carry superseding notes so batch fetch, legacy search, and identity/list routes are not mistaken for the current contract.
+- Regression coverage now protects both the live FastAPI route surface and the roadmap/contract docs from drifting back toward removed public read families.

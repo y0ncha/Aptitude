@@ -21,6 +21,17 @@ Public routes:
 - `GET /skills/{slug}/versions/{version}/content`
 - `PATCH /skills/{slug}/versions/{version}/status`
 
+## Freeze Rule
+
+This route set is the frozen public registry baseline for Plans 09-14.
+
+- Resolution remains a first-class public exact-read surface.
+- Exact fetch stays singular and coordinate-based through:
+  - `GET /skills/{slug}/versions/{version}`
+  - `GET /skills/{slug}/versions/{version}/content`
+- Later milestones may refine payload fields, headers, and policy behavior inside this route set, but they do not add sibling public read route families or compatibility aliases.
+- The server remains execution-agnostic: discovery returns candidate slugs, resolution returns direct authored `depends_on`, and exact fetch returns immutable metadata or markdown for one coordinate.
+
 ## Auth And Errors
 
 - `GET /healthz` and `GET /readyz` are unauthenticated.

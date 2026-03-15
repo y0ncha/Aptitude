@@ -75,9 +75,9 @@ primitives. The server does not perform the agent's reasoning or final choice.
 | Search index maintenance | Yes | No           | Includes full-text, metadata filters, and denormalized read models |
 | Metadata + description candidate retrieval | Yes | No           | Must happen close to indexes for low latency                       |
 | Deterministic base search ranking | Yes | No           | Advisory ranking only; no runtime solve semantics                  |
-| Search response explanation fields | Yes | No           | Helps clients understand why a result matched                      |
+| Public discovery response shape | Yes | No           | Returns ordered candidate slugs only; explanation or reranking data stays client-side |
 | Prompt interpretation | No | Yes          | User request normalization belongs to the client                   |
-| Query construction from prompt/context | No | Yes          | Client translates intent into `q`, filters, limits, and sort hints |
+| Query construction from prompt/context | No | Yes          | Client translates intent into the frozen discovery request shape: `name`, optional `description`, and optional `tags` |
 | Personalized or context-aware reranking | No | Yes          | Depends on workspace, org policy, current task, installed state    |
 | Final candidate selection | No | Yes          | Server returns candidates, not the final answer                    |
 | Dependency metadata storage per version | Yes | No           | Direct declarations are published metadata                         |
@@ -95,8 +95,8 @@ primitives. The server does not perform the agent's reasoning or final choice.
 ### Discovery Flow for Fast Agentic Search
 
 1. User or agent submits a prompt to the client.
-2. client extracts search intent:
-   `q`, tags, language, trust tier, lifecycle visibility, freshness, and other filters.
+2. client extracts search intent into:
+   `name`, optional `description`, and optional `tags`.
 3. client calls the registry discovery API.
 4. Server executes indexed retrieval over:
    - name
@@ -104,26 +104,26 @@ primitives. The server does not perform the agent's reasoning or final choice.
    - tags
    - structured metadata
    - lifecycle and trust filters
-5. Server returns a compact candidate set with stable ordering and explanation fields.
+5. Server returns ordered candidate slugs only.
 6. client reranks or prunes that candidate set using runtime context.
-7. client fetches exact version details for chosen candidates.
+7. client fetches exact metadata, content, and dependency details for chosen candidates.
 8. client performs dependency expansion, conflict handling, and lock generation locally.
 
 ### Exact Fetch and Execution Flow
 
 1. client selects concrete `(slug, version)` coordinates.
-2. client fetches immutable metadata and artifact identity from the server.
+2. client fetches immutable metadata and markdown content from the server as needed.
 3. client verifies checksums, expands dependencies, and builds a lock.
 4. client produces the execution plan and trace output.
 
 ## What the Server Must Do
 
-- Expose stable APIs for publish, fetch, list, and search.
+- Expose stable APIs for publish, discovery, public resolution, exact fetch, and lifecycle governance.
 - Maintain searchable indexes for metadata and descriptions.
 - Support deterministic candidate retrieval with stable tie-breaks.
 - Return compact search results so clients do not over-fetch full manifests
   during discovery.
-- Serve exact immutable version records and artifact identity for selected versions.
+- Serve exact immutable version metadata and markdown for selected versions.
 - Enforce publish/read governance and lifecycle visibility.
 - Optionally maintain denormalized read models and secondary indexes when they
   improve query performance, as long as they do not become the source of truth
@@ -196,7 +196,10 @@ The server must expose registry-oriented contracts such as:
 - `GET /skills/{slug}/versions/{version}`
 - `GET /skills/{slug}/versions/{version}/content`
 - `PATCH /skills/{slug}/versions/{version}/status`
-- Optional governance endpoints (`deprecate`, `archive`, `trust/admin`)
+
+This route set is the frozen public baseline. Later milestones may refine
+payload fields, headers, and policy behavior inside these routes, but they do
+not add sibling public read route families or compatibility aliases.
 
 `POST /discovery` should be designed for candidate generation, not final
 decision making. It should accept structured search input and return stable slug

@@ -46,3 +46,8 @@ Stabilize public repository API contracts and validation behavior to keep consum
 - Negative tests for schema validation failures.
 - Compatibility tests for existing endpoints after refactor.
 - Snapshot tests for error envelope consistency.
+
+## Historical Contract Note From Plans 07-09 (2026-03-15)
+- This milestone predates the hard-cut read simplification and contract freeze.
+- The final public contract is `POST /skill-versions`, `POST /discovery`, public `GET /resolution/{slug}/{version}`, exact `GET` metadata/content fetch under `/skills/{slug}/versions/{version}`, and `PATCH /skills/{slug}/versions/{version}/status`.
+- List routes and legacy search paths described above are historical context only and should not be treated as the current public baseline.

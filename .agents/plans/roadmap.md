@@ -20,6 +20,8 @@ Deliver a production-ready, PyPI-like immutable registry service (`aptitude-serv
 - Server remains execution-agnostic and exposes governed APIs for publish, discovery, resolution, exact fetch, lifecycle, and provenance.
 - Server contracts are slug candidates, authored direct dependency declarations, immutable metadata/content envelopes, and governance results; the server does not return canonical solved bundles.
 - Discovery remains candidate generation only; resolution remains exact first-degree dependency retrieval only; resolver choice and lock output remain authoritative.
+- Plans 09-14 keep the public route families fixed: publish, discovery, resolution, exact metadata fetch, exact content fetch, and lifecycle/governance operations.
+- Later milestones extend behavior inside that route set instead of adding new public read route families, compatibility aliases, or batch-fetch detours.
 
 ## Milestones
 1. `01-foundation-service-skeleton.md`

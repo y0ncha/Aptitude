@@ -3,7 +3,7 @@
 ## 1. Executive Summary
 
 - **Problem Statement**: Platform teams need a governed registry for publishing, discovering, and retrieving skills, but the server becomes harder to scale, cache, and reason about when it also owns prompt interpretation, dependency solving, or runtime planning. The registry must stay focused on fast data-local operations over immutable artifacts and searchable metadata.
-- **Proposed Solution**: Define `aptitude-server` as a package-registry-style service responsible for publish, fetch, list, search, governance, and audit contracts. Keep PostgreSQL authoritative for registry metadata, digest mappings, and immutable artifact payloads, using split tables for metadata and content, and treat Git only as optional authoring provenance rather than a runtime storage backend.
+- **Proposed Solution**: Define `aptitude-server` as a package-registry-style service responsible for publish, discovery, public resolution, exact fetch, governance, and audit contracts. Keep PostgreSQL authoritative for registry metadata, digest mappings, and immutable artifact payloads, using split tables for metadata and content, and treat Git only as optional authoring provenance rather than a runtime storage backend.
 - **Success Criteria**:
   - 100% of artifact and metadata writes happen through server APIs.
   - Immutable overwrite attempts for existing `(slug, version)` are rejected 100% of the time.
@@ -13,19 +13,19 @@
   - Immutable read APIs return stable `ETag` headers, and target conditional reads support `If-None-Match` with `304 Not Modified`.
   - Exact fetches do not require access to a Git repository or working tree.
   - 100% of publish, deprecate, archive, and admin-policy actions emit auditable events.
-- **In Scope**: Publish/download/list/search APIs, immutable versioning, metadata and discovery indexes, content-addressed artifact references, provenance and integrity controls, lifecycle governance, audit logging, and authorization on registry operations.
+- **In Scope**: Publish, discovery, public resolution, exact metadata/content fetch APIs, immutable versioning, metadata and discovery indexes, content-addressed artifact references, provenance and integrity controls, lifecycle governance, audit logging, and authorization on registry operations.
 - **Out of Scope**: Prompt interpretation, personalized reranking, final candidate selection, dependency solving, lock generation, runtime execution planning, and direct database access by consumers.
 
-### Current Status vs Planned State (March 13, 2026)
+### Current Status vs Planned State (March 15, 2026)
 
 - **Current Status**:
-  - FastAPI service is implemented with PostgreSQL-backed publish, fetch, list, discovery, direct relationship, lifecycle, auth, and audit paths.
+  - FastAPI service is implemented with PostgreSQL-backed publish, discovery, public resolution, exact fetch, lifecycle, auth, and audit paths.
   - The current HTTP surface uses concrete routes such as `POST /skill-versions`, `POST /discovery`, and `GET /skills/{slug}/versions/{version}`.
   - Digest-backed `ETag` emission on exact content fetch is implemented.
   - Full conditional-read behavior with `If-None-Match` returning `304 Not Modified` is not yet documented as implemented behavior.
 - **Planned State**:
-  - Preserve the same product boundary while continuing to harden the v1 contract, observability, governance, and cache semantics.
-  - Continue documenting the API in capability terms even where route naming may evolve before the public contract is finalized.
+  - Preserve the same product boundary while hardening the frozen v1 route families, observability, governance, and cache semantics.
+  - Continue documenting the API in capability terms while keeping the current route surface fixed.
 
 ## 2. User Experience & Functionality
 
@@ -45,9 +45,9 @@
   - The publish capability validates manifest schema, integrity fields, direct relationship selectors, trust-tier rules, and lifecycle requirements before accepting a new immutable version.
   - Publishing an existing `(slug, version)` returns a conflict and does not mutate stored metadata or artifacts.
   - Published versions persist direct dependency declarations exactly as authored; the server does not compute resolved dependency closures.
-  - The discovery capability supports full-text query plus structured filters over tags, language, trust tier, lifecycle state, freshness, and content-size limits.
-  - Search results return stable ordering, deterministic tie-breaks, and explanation fields describing why a result matched.
-  - The exact fetch capability returns immutable metadata, integrity fields, artifact reference data, and optional provenance metadata for the requested published version.
+  - The discovery capability accepts `name`, optional `description`, and optional `tags`, and returns ordered candidate slugs only.
+  - Discovery ordering remains deterministic, but explanation fields and final candidate choice stay outside the public server contract.
+  - The exact fetch capability returns immutable metadata or immutable raw markdown plus optional provenance metadata for the requested published version.
   - Published versions map immutably to a single `sha256` digest, and identical payloads reuse existing digest-backed PostgreSQL artifact rows.
   - Exact fetch and search behavior do not depend on a live Git checkout.
   - Deprecation and archive state are enforced consistently in discovery visibility and exact-read policy.
@@ -58,7 +58,7 @@
   - Executing plugins, workflows, or runtime plans.
   - Running LLM inference in the request path.
 
-### Current Status vs Planned State (March 13, 2026)
+### Current Status vs Planned State (March 15, 2026)
 
 - **Current Status**:
   - Publish is implemented at `POST /skill-versions`.
@@ -67,21 +67,21 @@
   - Direct dependency reads are implemented at `GET /resolution/{slug}/{version}`.
   - Bearer-token auth with `read`, `publish`, and `admin` scopes is enforced on business endpoints.
 - **Planned State**:
-  - The public contract may eventually normalize endpoint naming around publish/search capability labels, but the product requirement is the capability, not a specific path spelling.
-  - Search explanation fields, observability, and governance controls are expected to grow richer without changing the server/client boundary.
+  - The public route families are frozen around publish, discovery, public resolution, exact `GET` fetch, and lifecycle status updates.
+  - Observability, caching, and governance controls may grow richer without widening the public read surface.
 
 ## 3. AI System Requirements (If Applicable)
 
 - **Tool Requirements**:
   - Not applicable for the server control plane. `aptitude-server` performs indexed retrieval and policy enforcement, not model inference or agent orchestration.
-  - Required service primitives remain standard registry capabilities: publish, fetch, list, search, governance, and audit endpoints.
+  - Required service primitives remain standard registry capabilities: publish, discovery, public resolution, exact fetch, governance, and audit endpoints.
 
 - **Evaluation Strategy**:
   - No model-quality evaluation is required for MVP because the server does not interpret prompts or generate answers.
-  - Discovery quality is evaluated as retrieval quality: filter correctness, deterministic ordering, explanation field correctness, and latency/SLO compliance.
+  - Discovery quality is evaluated as retrieval quality: request-shape correctness, deterministic slug ordering, and latency/SLO compliance.
   - Contract quality is evaluated through integration and contract tests covering publish, fetch, discovery, relationship reads, lifecycle transitions, auth, and governance policy.
 
-### Current Status vs Planned State (March 13, 2026)
+### Current Status vs Planned State (March 15, 2026)
 
 - **Current Status**:
   - The implementation contains unit and integration coverage for registry flows and governance behavior.
@@ -128,7 +128,7 @@ flowchart LR
 
 | Status | Technology | Used For |
 | --- | --- | --- |
-| Current (MVP baseline) | Python + FastAPI + Swagger UI | Registry API boundary for publish, fetch, list, discovery, relationship reads, and governance contracts. |
+| Current (MVP baseline) | Python + FastAPI + Swagger UI | Registry API boundary for publish, discovery, public resolution, exact fetch, and governance contracts. |
 | Current (MVP baseline) | Pydantic v2 | Request and response validation for registry contracts. |
 | Current (MVP baseline) | Uvicorn via FastAPI CLI in development | ASGI serving in local development. |
 | Current (MVP baseline) | PostgreSQL | Canonical storage for versions, metadata, artifact payloads, lifecycle state, digest mappings, and audit records. |
@@ -152,11 +152,11 @@ flowchart LR
   - Git metadata is stored as normalized provenance fields only; read paths do not require repository access.
   - No prompt content, workspace context, or execution traces are stored by default; the service stores registry metadata and operational telemetry only.
 
-### Current Status vs Planned State (March 13, 2026)
+### Current Status vs Planned State (March 15, 2026)
 
 - **Current Status**:
   - The implementation matches the storage report recommendation: PostgreSQL only, with split metadata/content persistence and digest-addressed deduplication.
-  - The current API surface includes health, readiness, publish, discovery, relationship reads, exact fetch, and lifecycle status update routes.
+  - The current API surface includes health, readiness, publish, discovery, public resolution, exact fetch, and lifecycle status update routes.
   - Exact content responses emit `ETag` and `Cache-Control: public, immutable`.
 - **Planned State**:
   - Harden immutable-read cache semantics to full conditional GET behavior.
@@ -165,9 +165,9 @@ flowchart LR
 ## 5. Risks & Roadmap
 
 - **Phased Rollout**:
-  - **MVP**: immutable artifact catalog, publish/fetch/list/search APIs, relationship reads, digest deduplication in PostgreSQL, scoped auth, and minimal audit trail.
+  - **MVP**: immutable artifact catalog, publish/discovery/public-resolution/exact-fetch APIs, digest deduplication in PostgreSQL, scoped auth, and minimal audit trail.
   - **v1.0 hardening**: finalized public contract language, stronger conditional caching semantics, contract test expansion, and clearer backward-compatibility guarantees.
-  - **v1.1**: richer discovery filters, deprecate/archive governance controls, optional Git provenance capture, stronger search explanation fields, and observability improvements.
+  - **v1.1**: richer discovery internals, deprecate/archive governance controls, optional Git provenance capture, and observability improvements inside the frozen route set.
   - **v2.0**: signatures and attestations, multi-tenant governance policy packs, and optional dedicated search engine support.
 
 - **Technical Risks**:
@@ -178,7 +178,7 @@ flowchart LR
   - Git provenance can become an accidental second source of truth if publish and fetch semantics start depending on repository state.
   - Incomplete conditional caching behavior can cause unnecessary bandwidth usage even when immutable digests already exist.
 
-### Current Status vs Planned State (March 13, 2026)
+### Current Status vs Planned State (March 15, 2026)
 
 - **Current Status**:
   - Core registry capabilities are implemented and tested locally against PostgreSQL.
@@ -192,16 +192,16 @@ flowchart LR
   - Public API surface is limited to publish, discovery, exact immutable fetch, direct relationship reads, and governance operations.
   - Search is candidate generation over indexed registry data; the server does not interpret prompts or choose final results.
   - Exact `(slug, version)` reads are immutable and content-addressed through PostgreSQL-backed digest mappings to PostgreSQL artifact rows.
-  - Git provenance is advisory metadata only and is never a required runtime dependency for publish, search, or exact fetch behavior.
+  - Git provenance is advisory metadata only and is never a required runtime dependency for publish, discovery, resolution, or exact fetch behavior.
   - Derived search indexes are allowed for performance, but canonical truth remains the published version record and digest mapping.
 
 - **Server Exit Criteria**:
   - Contract `v1` is documented with explicit backward-compatibility rules and clear differentiation between current behavior and planned extensions.
-  - Integration and contract tests cover publish, list, search, exact metadata fetch, exact content fetch, relationship reads, deprecate, and archive flows.
+  - Integration and contract tests cover publish, discovery, public resolution, exact metadata fetch, exact content fetch, deprecate, and archive flows.
   - Search and fetch SLOs are verified against the MVP catalog-scale assumption.
   - Digest mapping and deduplication invariants are enforced in schema, service logic, and tests.
   - Audit events, authorization gates, and lifecycle policy are enforced for all privileged and mutating operations.
-  - Runbooks, dashboards, and alerts exist for publish, search, and fetch paths before production rollout.
+  - Runbooks, dashboards, and alerts exist for publish, discovery, resolution, and exact fetch paths before production rollout.
 
 ## Assumptions to Confirm
 

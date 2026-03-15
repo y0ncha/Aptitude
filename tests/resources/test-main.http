@@ -1,6 +1,14 @@
-# Test health endpoints
+# Manual sanity checks for the frozen public contract
 
-GET http://127.0.0.1:8000/healthz
+@host = http://127.0.0.1:8000
+@publisherToken = publisher-token
+@readerToken = reader-token
+@adminToken = admin-token
+@slug = sanity.skill.stub.{{$uuid}}
+@version = 1.0.0
+
+### Health
+GET {{host}}/healthz
 Accept: application/json
 
 > {%
@@ -11,7 +19,8 @@ client.test("healthz returns 200", function () {
 
 ###
 
-GET http://127.0.0.1:8000/readyz
+### Readiness
+GET {{host}}/readyz
 Accept: application/json
 
 > {%
@@ -22,38 +31,41 @@ client.test("readyz returns 200", function () {
 
 ###
 
-@host = http://127.0.0.1:8000
-@skill_id = sanity.skill.stub.{{$uuid}}
-@version = 1.0.0
-
-### Publish a skill version with the shared sanity artifact stub
-# Run the server first with: make run
-POST {{host}}/skills/publish
+### Publish one immutable version
+POST {{host}}/skill-versions
 Accept: application/json
-Content-Type: multipart/form-data; boundary=SkillBoundary
-
---SkillBoundary
-Content-Disposition: form-data; name="manifest"
 Content-Type: application/json
+Authorization: Bearer {{publisherToken}}
 
 {
-  "schema_version": "1.0",
-  "skill_id": "{{skill_id}}",
+  "slug": "{{slug}}",
   "version": "{{version}}",
-  "name": "Sanity Skill Stub",
-  "description": "Example publish request that reuses postman/assets/sanity-artifact.md as the artifact payload.",
-  "tags": ["sanity", "stub", "demo"],
-  "depends_on": [],
-  "extends": [],
-  "conflicts_with": [],
-  "overlaps_with": []
+  "content": {
+    "raw_markdown": "# Sanity Skill Stub\n\nManual frozen-contract check.\n",
+    "rendered_summary": "Manual frozen-contract check."
+  },
+  "metadata": {
+    "name": "Sanity Skill Stub",
+    "description": "Manual test for the frozen public contract.",
+    "tags": ["sanity", "stub", "manual"],
+    "headers": {"runtime": "python"},
+    "inputs_schema": {"type": "object"},
+    "outputs_schema": {"type": "object"},
+    "token_estimate": 64,
+    "maturity_score": 0.8,
+    "security_score": 0.9
+  },
+  "governance": {
+    "trust_tier": "untrusted",
+    "provenance": null
+  },
+  "relationships": {
+    "depends_on": [],
+    "extends": [],
+    "conflicts_with": [],
+    "overlaps_with": []
+  }
 }
---SkillBoundary
-Content-Disposition: form-data; name="artifact"; filename="sanity-artifact.md"
-Content-Type: text/markdown
-
-< ../postman/assets/sanity-artifact.md
---SkillBoundary--
 
 > {%
 client.test("publish returns 201", function () {
@@ -61,22 +73,80 @@ client.test("publish returns 201", function () {
 });
 %}
 
-### Fetch the published version
-GET {{host}}/skills/{{skill_id}}/{{version}}
+###
+
+### Discover by body request
+POST {{host}}/discovery
 Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{readerToken}}
+
+{
+  "name": "Sanity Skill Stub",
+  "description": "Manual test for the frozen public contract.",
+  "tags": ["sanity", "manual"]
+}
 
 > {%
-client.test("fetch returns 200", function () {
+client.test("discovery returns 200", function () {
   client.assert(response.status === 200, "Expected 200, got " + response.status + ": " + response.body);
 });
 %}
 
-### List all versions for the skill
-GET {{host}}/skills/{{skill_id}}
+###
+
+### Read direct dependencies
+GET {{host}}/resolution/{{slug}}/{{version}}
 Accept: application/json
+Authorization: Bearer {{readerToken}}
 
 > {%
-client.test("list returns 200", function () {
+client.test("resolution returns 200", function () {
+  client.assert(response.status === 200, "Expected 200, got " + response.status + ": " + response.body);
+});
+%}
+
+###
+
+### Fetch immutable metadata
+GET {{host}}/skills/{{slug}}/versions/{{version}}
+Accept: application/json
+Authorization: Bearer {{readerToken}}
+
+> {%
+client.test("metadata fetch returns 200", function () {
+  client.assert(response.status === 200, "Expected 200, got " + response.status + ": " + response.body);
+});
+%}
+
+###
+
+### Fetch immutable markdown content
+GET {{host}}/skills/{{slug}}/versions/{{version}}/content
+Accept: text/markdown
+Authorization: Bearer {{readerToken}}
+
+> {%
+client.test("content fetch returns 200", function () {
+  client.assert(response.status === 200, "Expected 200, got " + response.status + ": " + response.body);
+});
+%}
+
+###
+
+### Update lifecycle status
+PATCH {{host}}/skills/{{slug}}/versions/{{version}}/status
+Accept: application/json
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "status": "deprecated",
+  "note": "Manual frozen-contract lifecycle check."
+}
+
+> {%
+client.test("status update returns 200", function () {
   client.assert(response.status === 200, "Expected 200, got " + response.status + ": " + response.body);
 });
 %}

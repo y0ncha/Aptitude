@@ -4,6 +4,8 @@ This changelog documents implementation of [.agents/plans/05-metadata-search-ran
 
 The branch delivered more than indexed search. It also completed the PostgreSQL normalization work described by the milestone, moved exact content fetch onto database-backed markdown storage, and split read surfaces so discovery stays body-free. Supporting design references live in [docs/schema.md](../../docs/schema.md) and [docs/storage-strategy.md](../../docs/storage-strategy.md).
 
+Historical note (March 15, 2026): the route inventory described below predates the contract freeze from Plans 07-09. References to legacy identity/list routes, `GET /discovery/skills/search`, and `POST /resolution/relationships:batch` are transitional history only; the current public contract is documented in [docs/api-contract.md](/Users/yonatan/Dev/Aptitude/aptitude-server/docs/api-contract.md).
+
 ## Scope Delivered
 
 - The public HTTP contract now matches the normalized model instead of the legacy manifest-plus-artifact upload shape: [app/interface/api/skills.py](../../app/interface/api/skills.py) publishes `POST /skill-versions`, `GET /skills/{slug}`, and `GET /skills/{slug}/versions`, [app/interface/api/fetch.py](../../app/interface/api/fetch.py) serves exact metadata and raw markdown at `GET /skills/{slug}/versions/{version}` plus `.../content`, [app/interface/api/discovery.py](../../app/interface/api/discovery.py) exposes advisory search at `GET /discovery/skills/search`, and [app/interface/api/resolution.py](../../app/interface/api/resolution.py) exposes direct relationship reads at `POST /resolution/relationships:batch`.

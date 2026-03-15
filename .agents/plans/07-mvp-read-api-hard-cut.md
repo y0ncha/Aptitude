@@ -60,3 +60,12 @@ Reset the MVP read surface to a minimal breaking-change contract that is easy to
 - Negative review confirming the removed read routes do not appear in the MVP baseline.
 - Shape review confirming discovery is slug-only, resolution is first-degree only, and fetch is batch-only.
 - Documentation review confirming the milestone requires deletion of superseded code paths rather than compatibility wrappers.
+
+## Plan 09 Superseding Note (2026-03-15)
+- Plan 09 froze the final public read contract on the implemented route split:
+  - `POST /discovery`
+  - `GET /resolution/{slug}/{version}`
+  - `GET /skills/{slug}/versions/{version}`
+  - `GET /skills/{slug}/versions/{version}/content`
+- The earlier batch-fetch framing in this milestone is superseded design history, not the current public contract.
+- Later milestones extend behavior inside this route set rather than reintroducing `/discovery/skills/search`, `/resolution/relationships:batch`, batch-fetch routes, or compatibility aliases.

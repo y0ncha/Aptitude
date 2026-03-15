@@ -99,7 +99,7 @@ Server is responsible for registry correctness and governance.
 - Validates and publishes immutable artifacts.
 - Serves version metadata and artifact payloads.
 - Exposes indexed discovery over descriptions, tags, and structured metadata.
-- Returns compact, stable candidate sets with advisory ranking signals.
+- Returns ordered candidate slugs only.
 - Exposes lifecycle state (published/deprecated/archived).
 - Enforces publish/read governance and auditability.
 
@@ -139,7 +139,7 @@ Persistence ensures durability and integrity.
    - Client submits prompt/tool request to resolver.
 2. **Candidate Retrieval**
    - Resolver converts prompt intent into structured search input.
-   - Server returns a compact candidate set from indexed metadata and description search.
+   - Server returns ordered candidate slugs from indexed metadata and description search.
 3. **Selection**
    - Resolver reranks candidates using task, policy, and environment context.
 4. **Metadata Fetch**
