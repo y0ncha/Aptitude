@@ -87,8 +87,8 @@ Stable identity row.
 | --- | --- | --- | --- |
 | `id` | `bigint` | PK | Internal identity key |
 | `slug` | `text` | `NOT NULL`, unique | Stable public skill identifier |
-| `created_at` | `timestamptz` | `NOT NULL` | Row creation time |
-| `updated_at` | `timestamptz` | `NOT NULL` | Last identity-state update |
+| `created_at` | `timestamptz` | `NOT NULL`, server default | Row creation time |
+| `updated_at` | `timestamptz` | `NOT NULL`, server default | Last identity-state update |
 
 Constraints and indexes:
 
@@ -203,8 +203,8 @@ This table is derived from `skills`, `skill_versions`, `skill_metadata`, and
 | Column | Type | Purpose |
 | --- | --- | --- |
 | `skill_version_fk` | `bigint` | PK and FK to `skill_versions.id` |
-| `slug` | `text` | Normalized identifier for direct matching |
-| `normalized_slug` | `text` | Lowercased identifier for exact matching |
+| `slug` | `text` | Canonical/original identifier for direct matching; normalized form stored in `normalized_slug` |
+| `normalized_slug` | `text` | Lowercased/normalized identifier for exact matching |
 | `version` | `text` | Candidate version |
 | `name` | `text` | Display name |
 | `normalized_name` | `text` | Lowercased display name |

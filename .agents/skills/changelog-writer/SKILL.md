@@ -17,7 +17,9 @@ Write changelogs in the same style as project milestone changelogs under `docs/c
 ## Output Rules
 
 - Keep writing concise and technical; prefer bullets over long paragraphs.
-- Use Markdown links to concrete repo paths for routes, services, models, migrations, tests, and plans.
+- Use Markdown links to concrete repo-relative paths for routes, services, models, migrations, tests, and plans.
+- Prefer repo-relative links by default; GitHub links are acceptable when a hosted deep link is more useful.
+- Never use machine-specific absolute filesystem paths such as `/path/to/repo/...`.
 - Include at least one Mermaid diagram (`flowchart` or `sequenceDiagram`) that reflects the real implementation.
 - Add a schema section with Markdown tables. Each table row must explain field purpose, not only type.
 - Call out key tradeoffs and limits without repeating obvious code details.
@@ -37,6 +39,7 @@ Write changelogs in the same style as project milestone changelogs under `docs/c
 - Prefer deep links to the most specific file that proves the point.
 - When useful, include multiple links per bullet (API + core + persistence + test).
 - Keep link lists short and relevant.
+- Keep every link portable across machines by using repo-relative paths or GitHub URLs only.
 
 ## Reusable Template
 

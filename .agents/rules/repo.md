@@ -66,6 +66,11 @@ API contract changes include:
 
 - Use `kebab-case` for new filenames, rule identifiers, and plan slugs unless an external framework or tool requires a different format.
 
+## Portable Paths And Links
+
+- Use repo-relative paths or GitHub links for file references in docs, rules, plans, changelogs, and skill outputs.
+- Do not use machine-specific absolute filesystem paths such as `/path/to/repo/...`; they are not portable across environments.
+
 ## Mandatory Outputs
 
 - Stable manifest, integrity, and artifact metadata contracts for exact version reads.

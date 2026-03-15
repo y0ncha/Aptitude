@@ -118,3 +118,5 @@ Deferred sources: <paths not opened yet>
 - Read `rules/repo.md` when approval gates, repo rules, or process constraints may matter.
 - If a task clearly maps to one section in `.agents/agent.md`, do not open unrelated docs “just in case”.
 - If the task spans multiple areas, load sources in this order: rules, active plan, task-mapped docs, code paths, tests, changelog.
+- When reporting file references or source maps, use repo-relative paths or GitHub links only.
+- Never emit workstation-specific absolute paths such as `/path/to/repo/...`.
